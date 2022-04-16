@@ -1,18 +1,17 @@
-use std::any::Any;
+use serde::{Serialize, Deserialize};
 
-pub enum Types {
-    String,
-    Integer,
-    Float,
-    Uuid,
-    Boolean,
-    Array,
-    Hash,
-    Date
-}
-
+// Current only support string values 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Data {
     pub key: String,
-    pub value: Box<dyn Any>,
-    pub type_: Types
+    pub value: String,
+}
+
+impl Data {
+    pub fn new(key: String, value: String) -> Self {
+        Self {
+            key,
+            value
+        }
+    }
 }

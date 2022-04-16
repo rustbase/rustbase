@@ -8,7 +8,7 @@ pub struct Database {
 
 impl Database {
     pub fn new(path: String) -> Self {
-        println!("Initalize database, data path: {}", path);
+        println!("Initialing database, data path: {}", path);
 
         let db_path = path::Path::new(&path);
 
@@ -21,13 +21,23 @@ impl Database {
         }
     }
 
-    pub fn create_document(&self, name: String, data: Vec<storage::types::Data>) {
-        let document = storage::document::create_document(name, data);
-        storage::create_document_to_database(document, self.database_path.clone());
+    pub fn create_document(&self, name: String, data: Vec<storage::types::Data>) -> Result<(), &'static str> {
+        if path::Path::new(&self.database_path).join(name.clone() + "_0").exists() {
+            return Err("Document already exists");
+        }
+
+        let document = storage::document::create_document(name.clone(), data);
+        storage::create_document_to_database(&document, name, self.database_path.clone());
+
+        return Ok(());
     }
 
-    pub fn get_document() {
-        unimplemented!();
+    pub fn get_document(&self, name: String) -> Result<storage::document::Document, &'static str> {
+        if !path::Path::new(&self.database_path).join(name.clone() + "_0").exists() {
+            return Err("Document do not already exists");
+        }
+
+        return Ok(storage::get_document_from_database(name, self.database_path.clone()));
     }
 
     pub fn write_document() {

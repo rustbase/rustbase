@@ -1,47 +1,39 @@
 use crate::db::crypto;
-use chrono::prelude::*;
+use chrono::{prelude::*, serde::ts_seconds};
 use hex::ToHex;
+use serde::{Deserialize, Serialize};
 
 use super::types::Data;
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Document {
     pub id: String,
-    pub content: Vec<u8>,
+    pub content: Vec<Data>,
     pub name: String,
+    #[serde(with = "ts_seconds")]
     pub created_at: DateTime<Utc>,
+    #[serde(with = "ts_seconds")]
     pub updated_at: DateTime<Utc>,
 }
 
 impl Document {
-    pub fn create(name: String, content: &[u8]) -> Self {
+    pub fn create(name: String, content: Vec<Data>) -> Self {
         let id = crypto::generate_bytes::generate_random_bytes();
 
         Self {
             id: id.encode_hex::<String>(),
             name,
-            content: content.to_vec(),
+            content: content,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }
     }
 }
 
-unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
-    ::std::slice::from_raw_parts(
-        (p as *const T) as *const u8,
-        ::std::mem::size_of::<T>(),
-    )
-}
+pub fn create_document(name: String, data: Vec<Data>) -> Vec<u8> {
+    let document = Document::create(name, data);
 
-pub fn create_document(name: String, data: Vec<Data>) -> Document {
-    // Parse the data into a vector of bytes
-    let bytes_data = unsafe {
-        any_as_u8_slice(&data)
-    };
+    let json = serde_json::to_string(&document).unwrap();
 
-    // Create the document
-    let document = Document::create(name, bytes_data);
-
-    return document;
+    return json.as_bytes().to_vec();
 }

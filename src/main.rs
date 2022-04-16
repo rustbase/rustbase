@@ -11,7 +11,7 @@ use std::process;
 use std::{thread, time};
 use sysinfo::{Pid, ProcessExt, System, SystemExt};
 
-use crate::db::storage::types::{Data, Types};
+use crate::db::storage::types::{Data};
 
 use utils::{config as utils_config};
 
@@ -43,13 +43,11 @@ async fn main() {
     let database = db::initalize_database(config.database);
 
     // To test the database use:
-    // let test = vec![Data {
-    //     key: "Hello".to_string(),
-    //     value: Box::new("World".to_string()),
-    //     type_: Types::Integer,
-    // }];
+    let data = Data::new("key".to_string(), "value".to_string());
+    let test = vec![data];
 
-    // database.create_document("my_first_document".to_string(), test);
+    database.create_document("my_first_document".to_string(), test).unwrap();
+    database.get_document("my_first_document".to_string()).unwrap();
 }
 
 // Wait 1s and then exit

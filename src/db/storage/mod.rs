@@ -1,8 +1,14 @@
+use self::document::Document;
+
 pub mod document;
 pub mod write;
+pub mod read;
 pub mod types;
-use crate::db::storage::document::Document;
 
-pub fn create_document_to_database(value: Document, database_path: String) {
-    write::document(value, database_path);
+pub fn create_document_to_database(value: &[u8], document_name: String, database_path: String) {
+    write::document(value, document_name, database_path);
+}
+
+pub fn get_document_from_database(name: String, database_path: String) -> Document {
+    return read::document(name, database_path).unwrap();
 }
