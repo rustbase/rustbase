@@ -11,6 +11,8 @@ A noSQL document-oriented database cross-platform program written in [Rust](http
   - [ ] Cache internals
   - [ ] Cryptography
   - [ ] Variable types
+  - [ ] Database server
+  - [ ] TLS Server
 
 # License
 [MIT License](./LICENSE)

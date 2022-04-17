@@ -10,11 +10,8 @@
 *.out
 *.tmp
 
-rustbase.json
-
 # Database folders
 /data
-/src/server/certs
 
 # Windows resource file
 resource.rc

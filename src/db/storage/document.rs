@@ -1,8 +1,8 @@
-use crate::db::crypto;
 use chrono::{prelude::*, serde::ts_seconds};
 use hex::ToHex;
 use serde::{Deserialize, Serialize};
 
+use crate::crypto;
 use super::types::Data;
 
 #[derive(Serialize, Deserialize, Debug)]

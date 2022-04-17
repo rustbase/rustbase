@@ -1,15 +1,12 @@
 mod config;
 mod db;
 mod utils;
+mod crypto;
 
 use proctitle::set_title;
-use std::convert::TryFrom;
 use std::fs;
 use std::io::Write;
 use std::path;
-use std::process;
-use std::{thread, time};
-use sysinfo::{Pid, ProcessExt, System, SystemExt};
 
 use crate::db::storage::types::{Data};
 
@@ -24,18 +21,7 @@ fn get_exec_name() -> Option<String> {
 
 #[tokio::main]
 async fn main() {
-    set_title("Rustbase Database Server");
-
-    // Check if has another instance running
-    let s = System::new_all();
-    for process in s.processes_by_exact_name(get_exec_name().unwrap().as_str()) {
-        let pid = process.pid();
-        if pid != Pid::from(usize::try_from(process::id()).unwrap()) {
-            println!("Another instance of the server is already running. Exiting.");
-
-            exit(1);
-        }
-    }
+    set_title("Rustbase Database");
 
     let config = load_config();
 
@@ -43,19 +29,11 @@ async fn main() {
     let database = db::initalize_database(config.database);
 
     // To test the database use:
-    let data = Data::new("key".to_string(), "value".to_string());
-    let test = vec![data];
+    // let data = Data::new("key".to_string(), "value".to_string());
+    // let test = vec![data];
 
-    database.create_document("my_first_document".to_string(), test).unwrap();
-    database.get_document("my_first_document".to_string()).unwrap();
-}
-
-// Wait 1s and then exit
-fn exit(code: i32) {
-    let sleep_time = time::Duration::from_millis(1000);
-    thread::sleep(sleep_time);
-
-    std::process::exit(code);
+    // database.create_document("my_first_document".to_string(), test).unwrap();
+    // database.get_document("my_first_document".to_string()).unwrap();
 }
 
 fn load_config() -> config::Config {
@@ -71,10 +49,11 @@ fn load_config() -> config::Config {
         },
     };
 
-    if !path::Path::new("./rustbase.json").exists() {
+    // If has rustbase config, load it. Otherwise, use default config (and create a rustbase config).
+    if !path::Path::new("./data/config.json").exists() {
         println!("Creating config file...");
 
-        let mut file = fs::File::create("./rustbase.json").expect("Unable to create file");
+        let mut file = fs::File::create("./data/config.json").expect("Unable to create file");
         let json_string = serde_json::to_string_pretty(&config).expect("Unable to serialize");
 
         file.write(json_string.as_bytes())

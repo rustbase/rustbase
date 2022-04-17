@@ -11,6 +11,7 @@ In a document-oriented database, the data is stored in a collection of documents
   * `boolean`
   * `array`
   * `date`
+  * `map`
 2. Advanced types
   * `hash`
 

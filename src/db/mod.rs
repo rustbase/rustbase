@@ -1,6 +1,5 @@
 pub mod database;
 pub(crate) mod storage;
-mod crypto;
 mod sharding;
 use super::config;
 

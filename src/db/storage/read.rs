@@ -1,6 +1,6 @@
 use crate::db::sharding;
 
-use std::{fs};
+use std::fs;
 use std::path::Path;
 
 use super::document::Document;
