@@ -29,7 +29,7 @@ impl Database {
         let document = storage::document::create_document(name.clone(), data);
         storage::create_document_to_database(&document, name, self.database_path.clone());
 
-        return Ok(());
+        Ok(())
     }
 
     pub fn get_document(&self, name: String) -> Result<storage::document::Document, &'static str> {
@@ -37,7 +37,7 @@ impl Database {
             return Err("Document do not already exists");
         }
 
-        return Ok(storage::get_document_from_database(name, self.database_path.clone()));
+        Ok(storage::read_document_from_database(document_name, self.database_path.clone()))
     }
 
     pub fn write_document() {

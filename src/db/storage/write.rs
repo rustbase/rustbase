@@ -12,4 +12,6 @@ pub fn document(value: &[u8], document_name: String, database_path: String) {
     for shard in shards {
         fs::write(Path::new(&database_path).join(shard.name), shard.content).expect("Failed to write document");
     }
+    
+    Ok(())
 }

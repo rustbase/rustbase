@@ -56,11 +56,11 @@ fn load_config() -> config::Config {
         let mut file = fs::File::create("./data/config.json").expect("Unable to create file");
         let json_string = serde_json::to_string_pretty(&config).expect("Unable to serialize");
 
-        file.write(json_string.as_bytes())
+        file.write_all(json_string.as_bytes())
             .expect("Unable to write to file");
     } else {
         config = utils_config::get_config();
     }
 
-    return config;
+    config
 }

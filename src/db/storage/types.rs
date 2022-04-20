@@ -8,10 +8,19 @@ pub struct Data {
 }
 
 impl Data {
-    pub fn new(key: String, value: String) -> Self {
-        Self {
+    pub fn new(key: String, value: Types) -> Data {
+        if let Types::Hash(hash) = value {
+            let hash = hash::hash_content(hash);
+
+            return Data {
+                key,
+                value: Types::Hash(hash),
+            }
+        };
+
+        Data {
             key,
-            value
+            value,
         }
     }
 }

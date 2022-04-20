@@ -9,5 +9,5 @@ pub fn get_config() -> config::Config {
     file.read_to_string(&mut config_data)
         .expect("Unable to read file");
 
-    return serde_json::from_str(&config_data).expect("Unable to deserialize");
+    serde_json::from_str(&config_data).expect("Unable to deserialize")
 }

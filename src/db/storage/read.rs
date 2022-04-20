@@ -18,7 +18,7 @@ pub fn document(name: String, database_path: String) -> Result<Document, &'stati
         }
     };
 
-    if documents_path.len() == 0 {
+    if documents_path.is_empty() {
         return Err("Document not found");
     }
 
@@ -33,5 +33,5 @@ pub fn document(name: String, database_path: String) -> Result<Document, &'stati
 
     let document: Document = serde_json::from_str(&string_document).unwrap();
 
-    return Ok(document);
+    Ok(document)
 }

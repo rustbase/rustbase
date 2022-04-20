@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::crypto;
 use super::types::Data;
+use super::read;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Document {
@@ -23,7 +24,7 @@ impl Document {
         Self {
             id: id.encode_hex::<String>(),
             name,
-            content: content,
+            content,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }

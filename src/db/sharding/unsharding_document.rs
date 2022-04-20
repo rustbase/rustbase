@@ -6,5 +6,5 @@ pub fn unshard(sharded_documents: Vec<Vec<u8>>) -> String {
 
     let document = String::from_utf8_lossy(&document_content);
 
-    return document.to_string();
+    document.to_string()
 }
