@@ -1,4 +1,5 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use crate::crypto::hash;
 
 // Current only support string values 
 #[derive(Serialize, Deserialize, Debug)]
