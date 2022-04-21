@@ -21,19 +21,19 @@ impl Database {
         }
     }
 
-    pub fn create_document(&self, name: String, data: Vec<storage::types::Data>) -> Result<(), &'static str> {
-        if path::Path::new(&self.database_path).join(name.clone() + "_0").exists() {
+    pub fn create_document(&self, document_name: String, data: Vec<storage::types::Data>) -> Result<(), &'static str> {
+        if self.check_document_exists(document_name.clone()) {
             return Err("Document already exists");
         }
 
-        let document = storage::document::create_document(name.clone(), data);
-        storage::create_document_to_database(&document, name, self.database_path.clone());
+        let document = storage::document::create_document(document_name.clone(), data);
+        storage::write_document_to_database(&document, document_name, self.database_path.clone());
 
         Ok(())
     }
 
-    pub fn get_document(&self, name: String) -> Result<storage::document::Document, &'static str> {
-        if !path::Path::new(&self.database_path).join(name.clone() + "_0").exists() {
+    pub fn get_document(&self, document_name: String) -> Result<storage::document::Document, &'static str> {
+        if !self.check_document_exists(document_name.clone()) {
             return Err("Document do not already exists");
         }
 
@@ -50,5 +50,9 @@ impl Database {
 
     pub fn list_document() {
         unimplemented!();
+    }
+
+    fn check_document_exists(&self, name: String) -> bool {
+        path::Path::new(&self.database_path).join(name + "_0").exists()
     }
 }
