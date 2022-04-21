@@ -52,6 +52,7 @@ impl Database {
         unimplemented!();
     }
 
+}
 // Unit Tests
 #[cfg(test)]
 mod database_test {
