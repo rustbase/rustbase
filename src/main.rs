@@ -29,7 +29,7 @@ async fn main() {
     let database = db::initalize_database(config.database);
 
     // To test the database use:
-    // let data = Data::new("key".to_string(), "value".to_string());
+    // let data = Data::new("key".to_string(), Types::String("value".to_string()));
     // let test = vec![data];
 
     // database.create_document("my_first_document".to_string(), test).unwrap();
