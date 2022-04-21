@@ -65,7 +65,6 @@ mod database_test {
 
     #[test]
     fn create_database() {
-        clean_up_database();
         let database_path = path::Path::new(TEST_DB_PATH);
 
         if database_path.exists() {
@@ -79,17 +78,11 @@ mod database_test {
 
     #[test]
     fn create_document() {
-        clean_up_database();
-
         let database_path = path::Path::new(TEST_DB_PATH);
-
-        if database_path.exists() {
-            fs::remove_dir_all(database_path).expect("Failed to remove database path");
-        }
 
         let database = Database::new(database_path.to_str().unwrap().to_string());
 
-        let document_name = "test_document".to_string();
+        let document_name = "test_create_document".to_string();
         let data = vec![storage::types::Data::new(
             "test_data".to_string(),
             db::storage::types::Types::String("test_data".to_string()),
@@ -99,21 +92,16 @@ mod database_test {
             .create_document(document_name.clone(), data)
             .unwrap();
 
-        assert!(database_path.join(document_name.clone() + "_0").exists());
+        assert!(database_path.join(document_name + "_0").exists());
     }
 
     #[test]
     fn get_document()  {
-        clean_up_database();
         let database_path = path::Path::new(TEST_DB_PATH);
-
-        if database_path.exists() {
-            fs::remove_dir_all(database_path).expect("Failed to remove database path");
-        }
 
         let database = Database::new(database_path.to_str().unwrap().to_string());
 
-        let document_name = "test_document".to_string();
+        let document_name = "test_get_document".to_string();
         let data = vec![storage::types::Data::new(
             "test_data".to_string(),
             db::storage::types::Types::String("test_data".to_string()),
@@ -126,13 +114,5 @@ mod database_test {
         let document = database.get_document(document_name.clone()).unwrap();
 
         assert_eq!(document.name, document_name);
-    }
-
-    fn clean_up_database() {
-        let database_path = path::Path::new(TEST_DB_PATH);
-
-        if database_path.exists() {
-            fs::remove_dir_all(database_path).expect("Failed to remove database path");
-        }
     }
 }
