@@ -23,10 +23,13 @@ pub fn document(name: String, database_path: String) -> Result<Document, &'stati
     }
 
     let mut document_content: Vec<Vec<u8>> = Vec::new();
-
+    let mut index = 0;
     for document_path in documents_path {
-        let content = fs::read(Path::new(&database_path).join(document_path)).unwrap();
-        document_content.push(content);
+        if document_path.ends_with(index.to_string().as_str()) {
+            let content = fs::read(Path::new(&database_path).join(document_path)).unwrap();
+            document_content.push(content);
+            index += 1;
+        }
     }
 
     let string_document = sharding::unsharding_document::unshard(document_content);
