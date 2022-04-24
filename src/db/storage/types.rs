@@ -2,13 +2,13 @@ use serde::{Deserialize, Serialize};
 use crate::crypto::hash;
 
 // Current only support string values
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Data {
     pub key: String,
     pub value: Types,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum Types {
     String(String),
     Float(f64),
