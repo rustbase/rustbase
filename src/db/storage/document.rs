@@ -33,6 +33,18 @@ impl Document {
 pub fn create_document(name: String, data: Vec<Data>) -> Vec<u8> {
     let document = Document::create(name, data);
 
+    return parse_document_to_json(document);
+}
+
+pub fn write_document(document: Document, data: Vec<Data>) -> Vec<u8> {
+    let mut document = document;
+    document.content = data;
+    document.updated_at = Utc::now();
+
+    return parse_document_to_json(document);
+}
+
+pub fn parse_document_to_json(document: Document) -> Vec<u8> {
     let json = serde_json::to_string(&document).unwrap();
 
     return json.as_bytes().to_vec();
