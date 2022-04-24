@@ -1,4 +1,4 @@
-use crate::db::sharding;
+use crate::db::sharding::unsharding_document;
 
 use std::fs;
 use std::path::Path;
@@ -22,16 +22,19 @@ pub fn document(name: String, database_path: String) -> Result<Document, &'stati
         return Err("Document not found");
     }
 
-    let mut document_content: Vec<Vec<u8>> = Vec::new();
+    let mut document_content: Vec<unsharding_document::DocumentShard> = Vec::new();
 
     for document_path in documents_path {
-        let content = fs::read(Path::new(&database_path).join(document_path)).unwrap();
-        document_content.push(content);
+        let content = fs::read(Path::new(&database_path).join(document_path.clone())).unwrap();
+        document_content.push(unsharding_document::DocumentShard {
+            content,
+            name: document_path,
+        });
     }
 
-    let string_document = sharding::unsharding_document::unshard(document_content);
+    let string_document = unsharding_document::unshard(document_content);
 
-    let document: Document = serde_json::from_str(&string_document).unwrap();
+    let document: Document = serde_json::from_str(&string_document).expect("Failed to parse document, maybe the document is corrupted.");
 
     return Ok(document);
 }

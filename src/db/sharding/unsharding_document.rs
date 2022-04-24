@@ -1,10 +1,18 @@
-pub fn unshard(sharded_documents: Vec<Vec<u8>>) -> String {
+pub struct DocumentShard {
+    pub content: Vec<u8>,
+    pub name: String,
+}
+
+
+pub fn unshard(sharded_documents: Vec<DocumentShard>) -> String {
     let mut document_content: Vec<u8> = Vec::new();
+    let mut index = 0;
     for mut sharded_document in sharded_documents {
-        document_content.append(&mut sharded_document);
+        if sharded_document.name.ends_with(index.to_string().as_str()) {
+            document_content.append(&mut sharded_document.content);
+            index += 1;
+        }
     }
 
-    let document = String::from_utf8_lossy(&document_content);
-
-    return document.to_string();
+    return String::from_utf8(document_content).unwrap()
 }
