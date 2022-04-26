@@ -8,8 +8,6 @@ use std::fs;
 use std::io::Write;
 use std::path;
 
-use crate::db::storage::types::{Data};
-
 use utils::{config as utils_config};
 
 fn get_exec_name() -> Option<String> {
@@ -29,14 +27,19 @@ async fn main() {
     let database = db::initalize_database(config.database);
 
     // To test the database use:
-    // let data = Data::new("key".to_string(), Types::String("value".to_string()));
-    // let test = vec![data];
+    // let data = bson::bson!({
+    //     "some_test_key": "some_test_value"
+    // });
 
-    // database.create_document("my_first_document".to_string(), test).unwrap();
-    // database.get_document("my_first_document".to_string()).unwrap();
+    // database.create_document("test_create_document".to_string(), data).unwrap();
+    // let document = database.get_document("test_create_document".to_string()).unwrap();
 }
 
 fn load_config() -> config::Config {
+    if !path::Path::new("data").exists() {
+        fs::create_dir_all(&path::Path::new("data")).expect("Failed to create database path");
+    }
+
     // Default config
     let mut config = config::Config {
         net: config::Net {

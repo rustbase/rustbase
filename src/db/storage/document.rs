@@ -1,51 +1,38 @@
-use chrono::{prelude::*, serde::ts_seconds};
+use chrono::prelude::*;
 use hex::ToHex;
-use serde::{Deserialize, Serialize};
 
 use crate::crypto;
-use super::types::Data;
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Document {
-    pub id: String,
-    pub content: Vec<Data>,
-    pub name: String,
-    #[serde(with = "ts_seconds")]
-    pub created_at: DateTime<Utc>,
-    #[serde(with = "ts_seconds")]
-    pub updated_at: DateTime<Utc>,
+pub fn create_document(name: String, data: bson::Bson) -> bson::Document {
+    let mut document = bson::Document::new();
+
+    document = insert_default_values_to_document(document, name, data);
+
+    return document;
 }
 
-impl Document {
-    pub fn create(name: String, content: Vec<Data>) -> Self {
-        let id = crypto::generate_bytes::generate_random_bytes();
+pub fn write_document(document: bson::Document, data: bson::Bson) -> bson::Document {
+    let mut document = document.clone();
 
-        Self {
-            id: id.encode_hex::<String>(),
-            name,
-            content: content,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        }
-    }
+    document.insert("data", data);
+
+    return document;
 }
 
-pub fn create_document(name: String, data: Vec<Data>) -> Vec<u8> {
-    let document = Document::create(name, data);
-
-    return parse_document_to_json(document);
+pub fn parse_document_to_bson(document: bson::Document) -> Vec<u8> {
+    return bson::to_vec(&document).unwrap();
 }
 
-pub fn write_document(document: Document, data: Vec<Data>) -> Vec<u8> {
+pub fn insert_default_values_to_document(document: bson::Document, name: String, data: bson::Bson) -> bson::Document {
     let mut document = document;
-    document.content = data;
-    document.updated_at = Utc::now();
+    let id = crypto::generate_bytes::generate_random_bytes();
 
-    return parse_document_to_json(document);
-}
+    document.insert("created_at".to_string(), Utc::now());
+    document.insert("updated_at".to_string(), Utc::now());
+    document.insert("id".to_string(), id.encode_hex::<String>());
+    document.insert("name".to_string(), name);
 
-pub fn parse_document_to_json(document: Document) -> Vec<u8> {
-    let json = serde_json::to_string(&document).unwrap();
+    document.insert("data", data);
 
-    return json.as_bytes().to_vec();
+    return document;
 }

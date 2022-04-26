@@ -3,7 +3,7 @@ pub struct DocumentShard {
     pub name: String,
 }
 
-pub fn unshard(mut sharded_documents: Vec<DocumentShard>) -> String {
+pub fn unshard(mut sharded_documents: Vec<DocumentShard>) -> Vec<u8> {
     let mut document_content: Vec<u8> = Vec::new();
 
     sharded_documents.sort_by(|a, b| a.name.cmp(&b.name));
@@ -12,5 +12,5 @@ pub fn unshard(mut sharded_documents: Vec<DocumentShard>) -> String {
         document_content.append(&mut sharded_document.content);
     }
 
-    return String::from_utf8(document_content).unwrap()
+    return document_content;
 }
