@@ -7,13 +7,12 @@ In a document-oriented database, the data is stored in a collection of documents
 1. Basics types
   * `string`
   * `integer`
-  * `float`
+  * `double`
   * `boolean`
   * `array`
-  * `date`
-  * `map`
-2. Advanced types
-  * `hash`
+  * `timestamp`
+  * `binary`
+  * `document`
 
 ## Document
 On created a document, the document has a unique id, a date with the creation  e last modified date and a collection of fields.

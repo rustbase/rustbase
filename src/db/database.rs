@@ -21,18 +21,18 @@ impl Database {
         }
     }
 
-    pub fn create_document(&self, document_name: String, data: Vec<storage::types::Data>) -> Result<(), &'static str> {
+    pub fn create_document(&self, document_name: String, data: bson::Bson) -> Result<(), &'static str> {
         if self.check_document_exists(document_name.clone()) {
             return Err("Document already exists");
         }
 
         let document = storage::document::create_document(document_name.clone(), data);
-        storage::write_document_to_database(&document, document_name, self.database_path.clone());
+        storage::write_document_to_database(document, self.database_path.clone());
 
         return Ok(());
     }
 
-    pub fn get_document(&self, document_name: String) -> Result<storage::document::Document, &'static str> {
+    pub fn get_document(&self, document_name: String) -> Result<bson::Document, &'static str> {
         if !self.check_document_exists(document_name.clone()) {
             return Err("Document do not already exists");
         }
@@ -40,7 +40,7 @@ impl Database {
         return Ok(storage::get_document_from_database(document_name, self.database_path.clone()));
     }
 
-    pub fn write_document(&self, document_name: String, data: Vec<storage::types::Data>) -> Result<(), &'static str> {
+    pub fn write_document(&self, document_name: String, data: bson::Bson) -> Result<(), &'static str> {
         if !self.check_document_exists(document_name.clone()) {
             return Err("Document do not already exists");
         }
@@ -49,11 +49,15 @@ impl Database {
 
         let new_document = storage::document::write_document(document, data);
 
-        storage::write_document_to_database(&new_document, document_name, self.database_path.clone());
+        storage::write_document_to_database(new_document, self.database_path.clone());
     
         return Ok(())
     }
-    
+
+    pub fn insert_document() {
+        unimplemented!();
+    }
+
     pub fn read_document() {
         unimplemented!();
     }
@@ -97,10 +101,9 @@ mod database_test {
         let database = Database::new(database_path.to_str().unwrap().to_string());
 
         let document_name = "test_create_document".to_string();
-        let data = vec![storage::types::Data::new(
-            "test_data".to_string(),
-            db::storage::types::Types::String("test_data".to_string()),
-        )];
+        let data = bson::bson!({
+            "some_test_key": "some_test_value"
+        });
 
         database
             .create_document(document_name.clone(), data)
@@ -116,10 +119,9 @@ mod database_test {
         let database = Database::new(database_path.to_str().unwrap().to_string());
 
         let document_name = "test_get_document".to_string();
-        let data = vec![storage::types::Data::new(
-            "test_data".to_string(),
-            db::storage::types::Types::String("test_data".to_string()),
-        )];
+        let data = bson::bson!({
+            "some_test_key": "some_test_value"
+        });
 
         database
             .create_document(document_name.clone(), data)
@@ -127,7 +129,7 @@ mod database_test {
 
         let document = database.get_document(document_name.clone()).unwrap();
 
-        assert_eq!(document.name, document_name);
+        assert_eq!(document.get_str("name").unwrap(), document_name);
     }
 
     #[test]
@@ -138,10 +140,9 @@ mod database_test {
         let database = Database::new(database_path.to_str().unwrap().to_string());
 
         let document_name = "test_write_document".to_string();
-        let data = vec![storage::types::Data::new(
-            "test_data".to_string(),
-            db::storage::types::Types::String("test_data".to_string()),
-        )];
+        let data = bson::bson!({
+            "some_test_key": "some_test_value"
+        });
 
         database
             .create_document(document_name.clone(), data)
@@ -149,15 +150,14 @@ mod database_test {
 
         let document = database.get_document(document_name.clone()).unwrap();
 
-        let new_data = vec![storage::types::Data::new(
-            "test_new_data".to_string(),
-            db::storage::types::Types::String("test_new_data".to_string()),
-        )];
+        let new_data = bson::bson!({
+            "new_data": "new_data"
+        });
 
         database.write_document(document_name.clone(), new_data).unwrap();
 
         let new_document = database.get_document(document_name.clone()).unwrap();
 
-        assert_eq!(document.content[0].value, new_document.content[0].value);
+        assert_eq!(document.get_str("some_test_key").unwrap(), new_document.get_str("some_test_key").unwrap());
     }
 }

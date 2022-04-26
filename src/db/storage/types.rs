@@ -1,38 +1,28 @@
-use serde::{Deserialize, Serialize};
-use crate::crypto::hash;
-
-// Current only support string values
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone)]
 pub struct Data {
     pub key: String,
-    pub value: Types,
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub enum Types {
-    String(String),
-    Float(f64),
-    Integer(i64),
-    Boolean(bool),
-    Array(Vec<Types>),
-    Date(chrono::DateTime<chrono::Utc>),
-    Map(),
-    // Advanced types
-    Hash(Vec<u8>),
+    pub value: bson::Bson,
 }
 
 impl Data {
-    pub fn new(key: String, value: Types) -> Data {
-        if let Types::Hash(hash) = value {
-            let hash = hash::hash_content(hash);
-
-            return Data {
-                key,
-                value: Types::Hash(hash),
+    pub fn new(key: String, value: bson::Bson) -> Self {
+        match value {
+            bson::Bson::JavaScriptCode(_) => {
+                panic!("JavaScriptCode is not supported");
             }
-        };
 
-        Data {
+            bson::Bson::JavaScriptCodeWithScope(_) => {
+                panic!("JavaScriptCodeWithScope is not supported");
+            }
+
+            bson::Bson::DbPointer(_) => {
+                panic!("DbPointer is not supported");
+            }
+
+            _ => ()
+        }
+
+        Self {
             key,
             value,
         }

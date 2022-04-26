@@ -3,10 +3,7 @@ use crate::db::sharding::unsharding_document;
 use std::fs;
 use std::path::Path;
 
-use super::document::Document;
-
-
-pub fn document(name: String, database_path: String) -> Result<Document, &'static str> {
+pub fn document(name: String, database_path: String) -> Result<bson::Document, &'static str> {
     let data_dir = fs::read_dir(&database_path).unwrap();
 
     let mut documents_path: Vec<String> = Vec::new();
@@ -32,9 +29,9 @@ pub fn document(name: String, database_path: String) -> Result<Document, &'stati
         });
     }
 
-    let string_document = unsharding_document::unshard(document_content);
+    let bson_document = unsharding_document::unshard(document_content);
 
-    let document: Document = serde_json::from_str(&string_document).expect("Failed to parse document, maybe the document is corrupted.");
+    let bson_data = bson::from_slice(&bson_document).expect("Failed to parse document, maybe the document is corrupted.");
 
-    return Ok(document);
+    return Ok(bson_data);
 }
