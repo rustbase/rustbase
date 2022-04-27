@@ -12,5 +12,5 @@ pub fn unshard(mut sharded_collections: Vec<CollectionShard>) -> Vec<u8> {
         collection_content.append(&mut sharded_document.content);
     }
 
-    return collection_content;
+    collection_content
 }

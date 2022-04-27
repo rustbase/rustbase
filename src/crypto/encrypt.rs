@@ -5,7 +5,6 @@ pub fn encrypt(nonce: &[u8], key: &[u8], bytes_to_encrypt: &[u8]) -> Vec<u8> {
     let key = Key::from_slice(key);
     let nonce = Nonce::from_slice(nonce);
     let aead = Aes256Gcm::new(key);
-    let ciphertext = aead.encrypt(&nonce, bytes_to_encrypt).unwrap();
 
-    return ciphertext;
+    aead.encrypt(nonce, bytes_to_encrypt).unwrap()
 }

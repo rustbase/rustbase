@@ -15,7 +15,7 @@ pub fn collection(name: String, database_path: String) -> Result<bson::Document,
         }
     };
 
-    if collections_path.len() == 0 {
+    if collections_path.is_empty() {
         return Err("Document not found");
     }
 
@@ -33,5 +33,5 @@ pub fn collection(name: String, database_path: String) -> Result<bson::Document,
 
     let bson_data = bson::from_slice(&bson_document).expect("Failed to parse document, maybe the document is corrupted.");
 
-    return Ok(bson_data);
+    Ok(bson_data)
 }

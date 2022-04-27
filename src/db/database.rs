@@ -26,10 +26,10 @@ impl Database {
             return Err("Collection already exists");
         }
 
-        let document = storage::collection::create_collection(collection_name.clone(), data);
+        let document = storage::collection::create_collection(collection_name, data);
         storage::write_collection_to_database(document, self.database_path.clone());
 
-        return Ok(());
+        Ok(())
     }
 
     pub fn get_collection(&self, collection_name: String) -> Result<bson::Document, &'static str> {
@@ -37,7 +37,7 @@ impl Database {
             return Err("Collection do not already exists");
         }
 
-        return Ok(storage::get_collection_from_database(collection_name, self.database_path.clone()));
+        Ok(storage::get_collection_from_database(collection_name, self.database_path.clone()))
     }
 
     pub fn write_collection(&self, collection_name: String, data: bson::Bson) -> Result<(), &'static str> {
@@ -45,13 +45,13 @@ impl Database {
             return Err("Collection do not already exists");
         }
 
-        let collection = storage::read::collection(collection_name.clone(), self.database_path.clone()).unwrap();
+        let collection = storage::read::collection(collection_name, self.database_path.clone()).unwrap();
 
         let new_collection = storage::collection::write_collection(collection, data);
 
         storage::write_collection_to_database(new_collection, self.database_path.clone());
     
-        return Ok(())
+        Ok(())
     }
 
     pub fn insert_document_to_collection() {
@@ -156,7 +156,7 @@ mod database_test {
 
         database.write_collection(collection_name.clone(), new_data).unwrap();
 
-        let new_collection = database.get_collection(collection_name.clone()).unwrap();
+        let new_collection = database.get_collection(collection_name).unwrap();
 
         assert_eq!(collection.get_str("some_test_key").unwrap(), new_collection.get_str("some_test_key").unwrap());
     }

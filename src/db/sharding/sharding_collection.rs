@@ -27,5 +27,5 @@ pub fn shard(collection: Document) -> Vec<CollectionShard> {
         collections_sharded.push(collection_shard);
     });
 
-    return collections_sharded;
+    collections_sharded
 }

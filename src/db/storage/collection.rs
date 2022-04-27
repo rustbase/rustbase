@@ -8,19 +8,19 @@ pub fn create_collection(name: String, data: bson::Bson) -> bson::Document {
 
     collection = insert_default_values_to_collection(collection, name, data);
 
-    return collection;
+    collection
 }
 
 pub fn write_collection(collection: bson::Document, data: bson::Bson) -> bson::Document {
-    let mut collection = collection.clone();
+    let mut collection = collection;
 
     collection.insert("data", data);
 
-    return collection;
+    collection
 }
 
 pub fn parse_collection_to_bson(collection: bson::Document) -> Vec<u8> {
-    return bson::to_vec(&collection).unwrap();
+    bson::to_vec(&collection).unwrap()
 }
 
 pub fn insert_default_values_to_collection(collection: bson::Document, name: String, data: bson::Bson) -> bson::Document {
@@ -34,5 +34,5 @@ pub fn insert_default_values_to_collection(collection: bson::Document, name: Str
 
     collection.insert("data", data);
 
-    return collection;
+    collection
 }
