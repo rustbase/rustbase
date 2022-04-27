@@ -31,8 +31,8 @@ async fn main() {
     //     "some_test_key": "some_test_value"
     // });
 
-    // database.create_document("test_create_document".to_string(), data).unwrap();
-    // let document = database.get_document("test_create_document".to_string()).unwrap();
+    // database.create_collection("test_create_collection".to_string(), data).unwrap();
+    // let collection = database.get_collection("test_create_collection".to_string()).unwrap();
 }
 
 fn load_config() -> config::Config {
