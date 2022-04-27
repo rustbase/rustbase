@@ -625,7 +625,7 @@ dependencies = [
  "hex",
  "proctitle",
  "rand",
- "rand_core 0.5.1",
+ "rand_core 0.6.3",
  "ring",
  "serde",
  "serde_json",
