@@ -1,2 +1,2 @@
-pub mod sharding_document;
-pub mod unsharding_document;
+pub mod sharding_collection;
+pub mod unsharding_collection;
