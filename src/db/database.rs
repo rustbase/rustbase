@@ -26,6 +26,10 @@ impl Database {
             return Err("Collection already exists");
         }
 
+        if !self.check_if_is_document_or_array_of_documents(data.clone()) {
+            return Err("Data is not a document");
+        }
+
         let document = storage::collection::create_collection(collection_name, data);
         storage::write_collection_to_database(document, self.database_path.clone());
 
@@ -45,6 +49,10 @@ impl Database {
             return Err("Collection do not already exists");
         }
 
+        if !self.check_if_is_document_or_array_of_documents(data.clone()) {
+            return Err("Data is not a document");
+        }
+
         let collection = storage::read::collection(collection_name, self.database_path.clone()).unwrap();
 
         let new_collection = storage::collection::write_collection(collection, data);
@@ -54,7 +62,11 @@ impl Database {
         Ok(())
     }
 
-    pub fn insert_document_to_collection() {
+    pub fn create_document() {
+        unimplemented!();
+    }
+
+    pub fn create_documents() {
         unimplemented!();
     }
 
@@ -68,6 +80,10 @@ impl Database {
 
     fn check_collection_exists(&self, name: String) -> bool {
         return path::Path::new(&self.database_path).join(name + "_0").exists()
+    }
+
+    fn check_if_is_document_or_array_of_documents(&self, data: bson::Bson) -> bool {
+        return data.as_document().is_some() || (data.as_array().is_some() && data.as_array().unwrap().iter().all(|x| x.as_document().is_some()));
     }
 }
 
