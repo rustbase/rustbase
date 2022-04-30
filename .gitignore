@@ -12,6 +12,7 @@
 
 # Database folders
 /data
+/rustbase
 
 # Windows resource file
 resource.rc
