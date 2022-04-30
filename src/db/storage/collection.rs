@@ -1,3 +1,4 @@
+use bson::Document;
 use chrono::prelude::*;
 use hex::ToHex;
 
@@ -14,7 +15,15 @@ pub fn create_collection(name: String, data: bson::Bson) -> bson::Document {
 pub fn write_collection(collection: bson::Document, data: bson::Bson) -> bson::Document {
     let mut collection = collection;
 
-    collection.insert("data", data);
+    if data.as_document().is_some() {
+        collection.insert("data", vec![data]);
+
+    } else if data.as_array().is_some() && data.as_array().unwrap().iter().all(|x| x.as_document().is_some()) {
+        collection.insert("data", data.as_array().unwrap().clone());
+
+    } else {
+        panic!("Data is not a document");
+    }
 
     collection
 }
@@ -32,7 +41,59 @@ pub fn insert_default_values_to_collection(collection: bson::Document, name: Str
     collection.insert("id".to_string(), id.encode_hex::<String>());
     collection.insert("name".to_string(), name);
 
-    collection.insert("data", data);
+    if data.as_document().is_some() {
+        collection.insert("data", bson::bson!([data]));
+
+    } else if data.as_array().is_some() && data.as_array().unwrap().iter().all(|x| x.as_document().is_some()) {
+        collection.insert("data", data.as_array().unwrap().clone());
+
+    } else {
+        panic!("Data is not a document");
+    }
+
+    collection
+}
+
+pub fn create_document(collection: bson::Document, data: bson::Bson) -> bson::Document {
+    let mut collection = collection;
+
+    if data.as_document().is_none() {
+        panic!("Data is not a document");
+    }
+    
+    let data_array = collection.get_array("data").unwrap();
+
+    let mut new_data_array = bson::Array::new();
+
+    for data in data_array {
+        new_data_array.push(data.clone());
+    }
+    
+    new_data_array.push(data);
+
+    collection.insert("data", new_data_array);
+
+    collection
+}
+
+pub fn create_documents(collection: bson::Document, mut data: bson::Bson) -> bson::Document {
+    let mut collection = collection;
+
+    if data.as_array().is_none() && data.as_array().unwrap().iter().all(|x| x.as_document().is_none()) {
+        panic!("Data is not an array of documents");
+    }
+    
+    let data_array = collection.get_array("data").unwrap();
+
+    let mut new_data_array = bson::Array::new();
+
+    for data in data_array {
+        new_data_array.push(data.clone());
+    }
+    
+    new_data_array.append(data.as_array_mut().unwrap());
+
+    collection.insert("data", new_data_array);
 
     collection
 }
