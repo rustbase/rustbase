@@ -36,8 +36,8 @@ async fn main() {
 }
 
 fn load_config() -> config::Config {
-    if !path::Path::new("data").exists() {
-        fs::create_dir_all(&path::Path::new("data")).expect("Failed to create database path");
+    if !path::Path::new("rustbase").exists() {
+        fs::create_dir_all(&path::Path::new("rustbase")).expect("Failed to create database path");
     }
 
     // Default config
@@ -53,10 +53,10 @@ fn load_config() -> config::Config {
     };
 
     // If has rustbase config, load it. Otherwise, use default config (and create a rustbase config).
-    if !path::Path::new("./data/config.json").exists() {
+    if !path::Path::new("./rustbase/config.json").exists() {
         println!("Creating config file...");
 
-        let mut file = fs::File::create("./data/config.json").expect("Unable to create file");
+        let mut file = fs::File::create("./rustbase/config.json").expect("Unable to create file");
         let json_string = serde_json::to_string_pretty(&config).expect("Unable to serialize");
 
         file.write_all(json_string.as_bytes())
