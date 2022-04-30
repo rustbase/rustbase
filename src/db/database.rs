@@ -62,12 +62,32 @@ impl Database {
         Ok(())
     }
 
-    pub fn create_document() {
-        unimplemented!();
+    pub fn create_document(&self, collection_name: String, data: bson::Bson) -> Result<(), &'static str> {
+        if !self.check_collection_exists(collection_name.clone()) {
+            return Err("Collection do not already exists");
+        }
+
+        let collection = storage::read::collection(collection_name, self.database_path.clone()).unwrap();
+
+        let new_collection = storage::collection::create_document(collection, data);
+
+        storage::write_collection_to_database(new_collection, self.database_path.clone());
+
+        Ok(())
     }
 
-    pub fn create_documents() {
-        unimplemented!();
+    pub fn create_documents(&self, collection_name: String, data: bson::Bson) -> Result<(), &'static str> {
+        if !self.check_collection_exists(collection_name.clone()) {
+            return Err("Collection do not already exists");
+        }
+
+        let collection = storage::read::collection(collection_name, self.database_path.clone()).unwrap();
+
+        let new_collection = storage::collection::create_documents(collection, data);
+
+        storage::write_collection_to_database(new_collection, self.database_path.clone());
+
+        Ok(())
     }
 
     pub fn read_document() {
@@ -149,7 +169,6 @@ mod database_test {
     }
 
     #[test]
-    #[should_panic]
     fn write_collection() {
         let database_path = path::Path::new(TEST_DB_PATH);
 
@@ -174,6 +193,69 @@ mod database_test {
 
         let new_collection = database.get_collection(collection_name).unwrap();
 
-        assert_eq!(collection.get_str("some_test_key").unwrap(), new_collection.get_str("some_test_key").unwrap());
+        let collection_data = new_collection.get_array("data").unwrap();
+
+        assert!(collection_data[0].as_document().unwrap().get_str("new_data").is_ok());
+    }
+
+    #[test]
+    fn create_document() {
+        let database_path = path::Path::new(TEST_DB_PATH);
+
+        let database = Database::new(database_path.to_str().unwrap().to_string());
+
+        let collection_name = "test_create_document".to_string();
+        let data = bson::bson!({
+            "some_test_key": "some_test_value"
+        });
+
+
+        database
+            .create_collection(collection_name.clone(), data)
+            .unwrap();
+        
+        let new_data = bson::bson!({
+            "new_data": "new_data"
+        });
+
+        database.create_document(collection_name.clone(), new_data).unwrap();
+
+        let collection = database.get_collection(collection_name).unwrap();
+
+        let collection_data = collection.get_array("data").unwrap();
+
+        assert!(collection_data[1].as_document().unwrap().get_str("new_data").is_ok());
+    }
+
+    #[test]
+    fn create_documents() {
+        let database_path = path::Path::new(TEST_DB_PATH);
+
+        let database = Database::new(database_path.to_str().unwrap().to_string());
+
+        let collection_name = "test_create_documents".to_string();
+        let data = bson::bson!({
+            "some_test_key": "some_test_value"
+        });
+
+
+        database
+            .create_collection(collection_name.clone(), data)
+            .unwrap();
+        
+        let new_data = bson::bson!([{
+            "new_data_1": "new_data_1"
+        }, {
+            "new_data_2": "new_data_2"
+        }]);
+
+        database.create_documents(collection_name.clone(), new_data).unwrap();
+
+        let collection = database.get_collection(collection_name).unwrap();
+
+        let collection_data = collection.get_array("data").unwrap();
+
+        assert!(collection_data[1].as_document().unwrap().get_str("new_data_1").is_ok());
+        assert!(collection_data[2].as_document().unwrap().get_str("new_data_2").is_ok());
     }
 }
