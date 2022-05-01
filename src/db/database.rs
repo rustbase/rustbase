@@ -30,8 +30,8 @@ impl Database {
             return Err("Data is not a document");
         }
 
-        let document = storage::collection::create_collection(collection_name, data);
-        storage::write_collection_to_database(document, self.database_path.clone());
+        let collection = storage::collection::create_collection(collection_name, data);
+        storage::write_collection_to_database(collection, self.database_path.clone());
 
         Ok(())
     }
@@ -55,7 +55,9 @@ impl Database {
 
         let collection = storage::read::collection(collection_name, self.database_path.clone()).unwrap();
 
-        let new_collection = storage::collection::write_collection(collection, data);
+        let parsed_documents = storage::document::create_document(collection.clone(), data);
+
+        let new_collection = storage::collection::write_collection(collection, parsed_documents);
 
         storage::write_collection_to_database(new_collection, self.database_path.clone());
     
@@ -69,7 +71,9 @@ impl Database {
 
         let collection = storage::read::collection(collection_name, self.database_path.clone()).unwrap();
 
-        let new_collection = storage::collection::create_document(collection, data);
+        let parsed_documents = storage::document::create_document(collection.clone(), data);
+
+        let new_collection = storage::collection::write_collection(collection, parsed_documents);
 
         storage::write_collection_to_database(new_collection, self.database_path.clone());
 
@@ -83,7 +87,9 @@ impl Database {
 
         let collection = storage::read::collection(collection_name, self.database_path.clone()).unwrap();
 
-        let new_collection = storage::collection::create_documents(collection, data);
+        let parsed_documents = storage::document::create_documents(collection.clone(), data);
+
+        let new_collection = storage::collection::write_collection(collection, parsed_documents);
 
         storage::write_collection_to_database(new_collection, self.database_path.clone());
 
