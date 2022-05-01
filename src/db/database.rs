@@ -201,7 +201,7 @@ mod database_test {
 
         let collection_data = new_collection.get_array("data").unwrap();
 
-        assert!(collection_data[0].as_document().unwrap().get_str("new_data").is_ok());
+        assert!(collection_data[1].as_document().unwrap().get_str("new_data").is_ok());
     }
 
     #[test]
