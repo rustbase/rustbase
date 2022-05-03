@@ -50,3 +50,24 @@ pub fn prepare_document(document: bson::Bson) -> bson::Bson {
 
     bson::Bson::Document(document.clone())
 }
+
+pub fn get_document(collection: bson::Document, id: String) -> bson::Document {
+    let data_array = collection.get_array("data").unwrap();
+
+    for document in data_array.clone().into_iter() {
+        if document.as_document().is_none() {
+            panic!("Data is not a document");
+        }
+    }
+
+    for document in data_array.clone().into_iter() {
+        let document = document.as_document().unwrap();
+        let document_id = document.get_str("id").unwrap();
+
+        if document_id == id {
+            return document.clone();
+        }
+    }
+
+    panic!("Document not found");
+}
