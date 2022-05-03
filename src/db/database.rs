@@ -21,7 +21,7 @@ impl Database {
         }
     }
 
-    pub fn create_collection(&self, collection_name: String, data: bson::Bson) -> Result<bson::Bson, &'static str> {
+    pub fn create_collection(&self, collection_name: String, data: bson::Bson) -> Result<bson::Array, &'static str> {
         if self.check_collection_exists(collection_name.clone()) {
             return Err("Collection already exists");
         }
@@ -35,7 +35,7 @@ impl Database {
 
         let documents = collection.get_array("data").unwrap();
 
-        Ok(bson::Bson::Array(documents.clone()))
+        Ok(documents.clone())
     }
 
     pub fn get_collection(&self, collection_name: String) -> Result<bson::Document, &'static str> {
@@ -46,7 +46,7 @@ impl Database {
         Ok(storage::get_collection_from_database(collection_name, self.database_path.clone()))
     }
 
-    pub fn write_collection(&self, collection_name: String, data: bson::Bson) -> Result<bson::Bson, &'static str> {
+    pub fn write_collection(&self, collection_name: String, data: bson::Bson) -> Result<bson::Array, &'static str> {
         if !self.check_collection_exists(collection_name.clone()) {
             return Err("Collection do not already exists");
         }
@@ -63,10 +63,10 @@ impl Database {
 
         storage::write_collection_to_database(new_collection, self.database_path.clone());
     
-        Ok(bson::Bson::Array(parsed_documents))
+        Ok(parsed_documents)
     }
 
-    pub fn create_document(&self, collection_name: String, data: bson::Bson) -> Result<bson::Bson, &'static str> {
+    pub fn create_document(&self, collection_name: String, data: bson::Bson) -> Result<bson::Array, &'static str> {
         if !self.check_collection_exists(collection_name.clone()) {
             return Err("Collection do not already exists");
         }
@@ -79,10 +79,10 @@ impl Database {
 
         storage::write_collection_to_database(new_collection, self.database_path.clone());
 
-        Ok(bson::Bson::Array(parsed_documents))
+        Ok(parsed_documents)
     }
 
-    pub fn create_documents(&self, collection_name: String, data: bson::Bson) -> Result<bson::Bson, &'static str> {
+    pub fn create_documents(&self, collection_name: String, data: bson::Bson) -> Result<bson::Array, &'static str> {
         if !self.check_collection_exists(collection_name.clone()) {
             return Err("Collection do not already exists");
         }
@@ -95,11 +95,19 @@ impl Database {
 
         storage::write_collection_to_database(new_collection, self.database_path.clone());
 
-        Ok(bson::Bson::Array(parsed_documents))
+        Ok(parsed_documents)
     }
 
-    pub fn read_document() {
-        unimplemented!();
+    pub fn get_document(&self, collection_name: String, document_id: String) -> Result<bson::Document, &'static str> {
+        if !self.check_collection_exists(collection_name.clone()) {
+            return Err("Collection do not already exists");
+        }
+
+        let collection = storage::read::collection(collection_name, self.database_path.clone()).unwrap();
+
+        let document = storage::document::get_document(collection, document_id);
+
+        Ok(document)
     }
     
     pub fn list_documents() {
@@ -265,5 +273,23 @@ mod database_test {
 
         assert!(collection_data[1].as_document().unwrap().get_str("new_data_1").is_ok());
         assert!(collection_data[2].as_document().unwrap().get_str("new_data_2").is_ok());
+    }
+
+    #[test]
+    fn get_document() {
+        let database_path = path::Path::new(TEST_DB_PATH);
+
+        let database = Database::new(database_path.to_str().unwrap().to_string());
+
+        let collection_name = "test_get_document".to_string();
+        let data = bson::bson!({
+            "some_test_key": "some_test_value"
+        });
+
+        let document = database.create_collection(collection_name.clone(), data).unwrap();
+
+        let collection = database.get_document(collection_name, document[0].as_document().unwrap().get_str("id").unwrap().to_string()).unwrap();
+        
+        assert!(collection.get_str("some_test_key").is_ok());
     }
 }
