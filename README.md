@@ -1,6 +1,5 @@
 <div align="center">
-    <img src="./assets/icon.png" height="100">
-    <p>Rustbase</p>
+    <img src="https://github.com/rustbase.png?size=115">
 </div>
 
 # Rustbase
@@ -10,11 +9,12 @@ A noSQL document-oriented database cross-platform program written in [Rust](http
 [Click here](./CONTRIBUTING.md) to see how to Contribute
 
 # Authors
-<div align=center>
-    <a href="https://github.com/pedrinfx">
-        <img src="https://github.com/pedrinfx.png" height=100>
-        <p align=center>pedrinfx</p>
-    </a>
+<div align="center">
+
+| [<img src="https://github.com/pedrinfx.png?size=115" width=115><br><sub>@pedrinfx</sub>](https://github.com/filipedeschamps)
+| :---: |
+
+
 </div>
 
 # License
