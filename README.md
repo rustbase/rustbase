@@ -11,7 +11,7 @@ A noSQL document-oriented database cross-platform program written in [Rust](http
 # Authors
 <div align="center">
 
-| [<img src="https://github.com/pedrinfx.png?size=115" width=115><br><sub>@pedrinfx</sub>](https://github.com/filipedeschamps)
+| [<img src="https://github.com/pedrinfx.png?size=115" width=115><br><sub>@pedrinfx</sub>](https://github.com/pedrinfx)
 | :---: |
 
 
