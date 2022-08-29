@@ -12,6 +12,7 @@
 
 # Database folders
 /data
+config.json
 
 # Windows resource file
 resource.rc
