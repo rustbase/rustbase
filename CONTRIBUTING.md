@@ -21,7 +21,7 @@ mod your_feature_tests {
 ```
 
 ### Running unit tests
-To run a unit test use: `cargo run -- --test-threads=1`
+To run a unit test use: `cargo test`
 
 See more about unit tests [here](https://doc.rust-lang.org/rust-by-example/testing/unit_testing.html)
 
