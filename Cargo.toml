@@ -1,16 +1,12 @@
 [package]
 name = "rustbase"
-version = "0.1.0"
+version = "0.1.0-beta"
 edition = "2021"
 build = "./src/build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-aes-gcm = "0.9.4"
-rand = "0.8.5"
-x25519-dalek = "1"
-rand_core = "0.6.1"
 serde = { version = "1.0.136", features = ["derive"] }
 serde_json = "1.0"
 proctitle = "0.1.1"
@@ -18,16 +14,23 @@ sysinfo = "0.23.5"
 tokio = { version = "1.17.0", features = ["full"] }
 chrono = { version = "0.4.19", features = ["serde"] }
 hex = "0.4.3"
-sha2 = "0.9.2"
-ring = "0.16.20"
-bson = { version = "2.2.0", features = ["chrono-0_4"] }
+bson = "2.4.0"
+dustdata = "0.2.7"
+tonic = "0.8.0"
+prost = "0.11.0"
+num_cpus = "1.13.1"
+
 
 [build-dependencies]
 winres = "0.1"
+tonic-build = "0.8.0"
 
 [package.metadata.winres]
 OriginalFilename = "rustbase.exe"
 LegalCopyright = "Rustbase © 2022, The Rustbase Project Developers"
 ProductName = "Rustbase Database"
-ProductVersion = "0.1.0"
+ProductVersion = "0.1.0-beta"
 FileDescription = "Rustbase Database Server"
+
+[package.metadata]
+VersionCode = "Nabla"
