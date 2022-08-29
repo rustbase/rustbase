@@ -3,7 +3,10 @@
 </div>
 
 # Rustbase
-A noSQL document-oriented database cross-platform program written in [Rust](https://www.rust-lang.org/)
+A noSQL key-value database cross-platform program written in [Rust](https://www.rust-lang.org/)
+
+# ⚠️ Warning
+This is a work in progress. *Current available only for Linux*.
 
 # 🔗 Contribute
 [Click here](./CONTRIBUTING.md) to see how to Contribute
@@ -11,8 +14,8 @@ A noSQL document-oriented database cross-platform program written in [Rust](http
 # Authors
 <div align="center">
 
-| [<img src="https://github.com/pedrinfx.png?size=115" width=115><br><sub>@pedrinfx</sub>](https://github.com/pedrinfx)
-| :---: |
+| [<img src="https://github.com/pedrinfx.png?size=115" width=115><br><sub>@pedrinfx</sub>](https://github.com/pedrinfx) |
+| :-------------------------------------------------------------------------------------------------------------------: |
 
 
 </div>
