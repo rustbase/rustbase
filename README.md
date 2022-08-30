@@ -5,6 +5,8 @@
 # Rustbase
 A noSQL key-value database cross-platform program written in [Rust](https://www.rust-lang.org/)
 
+Join our [community](https://discord.gg/m5ZzWPumbd) and [chat](https://discord.gg/m5ZzWPumbd) with other Rust users.
+
 # ⚠️ Warning
 This is a work in progress. *Current available only for Linux*.
 
