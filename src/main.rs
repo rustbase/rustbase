@@ -30,6 +30,7 @@ fn load_config() -> config::Config {
         },
         database: config::Database {
             path: "./data".to_string(),
+            cache_size: spec::DEFAULT_CACHE_SIZE,
         },
     };
 

@@ -237,17 +237,15 @@ dependencies = [
 
 [[package]]
 name = "dustdata"
-version = "0.2.7"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15cf9ea4b33f96be0d1cc326918432c94b41615110fb8f7fe1dfd8f0723b419d"
+checksum = "f85fe9bc4271bcac3c4935f235bb9b8b2efa68e1d33794690cd2b80abb99d01f"
 dependencies = [
  "bitvec",
  "bson",
- "chrono",
  "fasthash",
  "hex",
  "lzzzz",
- "rand 0.8.5",
 ]
 
 [[package]]
@@ -983,7 +981,7 @@ dependencies = [
 
 [[package]]
 name = "rustbase"
-version = "0.1.0-beta"
+version = "0.1.1-beta"
 dependencies = [
  "bson",
  "chrono",
@@ -1021,9 +1019,9 @@ checksum = "58f57ca1d128a43733fd71d583e837b1f22239a37ebea09cde11d8d9a9080f47"
 
 [[package]]
 name = "serde"
-version = "1.0.136"
+version = "1.0.144"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce31e24b01e1e524df96f1c2fdd054405f8d7376249a5110886fb4b658484789"
+checksum = "0f747710de3dcd43b88c9168773254e809d8ddbdf9653b84e2554ab219f17860"
 dependencies = [
  "serde_derive",
 ]
@@ -1039,9 +1037,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.136"
+version = "1.0.144"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08597e7152fcd306f41838ed3e37be9eaeed2b61c42e2117266a554fab4662f9"
+checksum = "94ed3a816fb1d101812f83e789f888322c34e291f894f19590dc310963e87a00"
 dependencies = [
  "proc-macro2",
  "quote",

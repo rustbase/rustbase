@@ -1,13 +1,13 @@
 [package]
 name = "rustbase"
-version = "0.1.0-beta"
+version = "0.1.1-beta"
 edition = "2021"
 build = "./src/build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde = { version = "1.0.136", features = ["derive"] }
+serde = { version = "1.0.144", features = ["derive"] }
 serde_json = "1.0"
 proctitle = "0.1.1"
 sysinfo = "0.23.5"
@@ -15,7 +15,7 @@ tokio = { version = "1.17.0", features = ["full"] }
 chrono = { version = "0.4.19", features = ["serde"] }
 hex = "0.4.3"
 bson = "2.4.0"
-dustdata = "0.2.7"
+dustdata = "0.2.8"
 tonic = "0.8.0"
 prost = "0.11.0"
 num_cpus = "1.13.1"
