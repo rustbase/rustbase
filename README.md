@@ -5,10 +5,32 @@
 # Rustbase
 A noSQL key-value database cross-platform program written in [Rust](https://www.rust-lang.org/)
 
-Join our [community](https://discord.gg/m5ZzWPumbd) and [chat](https://discord.gg/m5ZzWPumbd) with other Rust users.
+Join our [Discord server](https://discord.gg/m5ZzWPumbd) to get help and discuss features.
 
 # ⚠️ Warning
 This is a work in progress. *Current available only for Linux*.
+
+# Development Dependencies
+Because of `tonic` dependency, we need some extra dependencies to compile the program.
+
+## Ubuntu
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y protobuf-compiler libprotobuf-dev
+```
+
+## Alpine Linux
+```bash
+sudo apk add protoc protobuf-dev
+```
+
+## MacOS
+```bash
+brew install protobuf
+```
+
+[Reference](https://github.com/hyperium/tonic#dependencies)
+
 
 # 🔗 Contribute
 [Click here](./CONTRIBUTING.md) to see how to Contribute
