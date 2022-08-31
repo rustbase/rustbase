@@ -35,10 +35,16 @@ fn load_config() -> config::Config {
     };
 
     // If has rustbase config, load it. Otherwise, use default config (and create a rustbase config).
-    if !path::Path::new(spec::DEFAULT_CONFIG_PATH).exists() {
+    let config_path = format!(
+        "{}/{}",
+        std::env::current_dir().unwrap().to_str().unwrap(),
+        spec::DEFAULT_CONFIG_NAME
+    );
+
+    if !path::Path::new(&config_path).exists() {
         println!("Creating config file...");
 
-        let mut file = fs::File::create(spec::DEFAULT_CONFIG_PATH).expect("Unable to create file");
+        let mut file = fs::File::create(config_path).expect("Unable to create file");
         let json_string = serde_json::to_string_pretty(&config).expect("Unable to serialize");
 
         file.write_all(json_string.as_bytes())
