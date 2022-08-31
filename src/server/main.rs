@@ -10,6 +10,7 @@ pub mod rustbase {
 
 pub struct DatabaseServer {
     database: Arc<Mutex<dustdata::DustData>>,
+    cache: Arc<Mutex<super::cache::Cache>>,
 }
 
 #[tonic::async_trait]
@@ -18,25 +19,35 @@ impl Rustbase for DatabaseServer {
         &self,
         request: Request<rustbase::Key>,
     ) -> Result<Response<rustbase::Bson>, Status> {
-        let value = self
-            .database
-            .lock()
-            .unwrap()
-            .get(&request.get_ref().key)
-            .unwrap();
+        let mut cache = self.cache.lock().unwrap();
+        let key = &request.get_ref().key;
 
-        if value.is_none() {
-            return Err(Status::new(
-                tonic::Code::NotFound,
-                format!("Key not found: {}", request.get_ref().key),
-            ));
+        if cache.contains(key.to_string()) {
+            let value = cache.get(key).unwrap();
+            let response = rustbase::Bson {
+                bson: bson::to_vec(&Some(value.clone())).unwrap(),
+            };
+            return Ok(Response::new(response));
+        } else {
+            let dd = self.database.lock().unwrap();
+            let value = dd.get(&request.get_ref().key).unwrap();
+
+            if value.is_none() {
+                return Err(Status::new(
+                    tonic::Code::NotFound,
+                    format!("Key not found: {}", request.get_ref().key),
+                ));
+            }
+
+            let response = rustbase::Bson {
+                bson: bson::to_vec(&value.clone().unwrap()).unwrap(),
+            };
+
+            let cache_insert = cache.insert(key.to_string(), value.unwrap());
+            cache_insert.ok();
+
+            Ok(Response::new(response))
         }
-
-        let response = rustbase::Bson {
-            bson: bson::to_vec(&value.unwrap()).unwrap(),
-        };
-
-        Ok(Response::new(response))
     }
 
     async fn insert(
@@ -44,11 +55,17 @@ impl Rustbase for DatabaseServer {
         request: Request<rustbase::KeyValue>,
     ) -> Result<Response<rustbase::Key>, Status> {
         let value: Document = bson::from_slice(&request.get_ref().value).unwrap();
-        self.database
-            .lock()
-            .unwrap()
-            .insert(&request.get_ref().key, value)
-            .unwrap();
+        let key = &request.get_ref().key;
+        let mut dd = self.database.lock().unwrap();
+
+        if dd.contains(key) {
+            return Err(Status::new(
+                tonic::Code::AlreadyExists,
+                format!("Key already exists: {}", key),
+            ));
+        }
+
+        dd.insert(&request.get_ref().key, value).unwrap();
 
         let response = rustbase::Key {
             key: request.get_ref().key.clone(),
@@ -62,11 +79,17 @@ impl Rustbase for DatabaseServer {
         request: Request<rustbase::KeyValue>,
     ) -> Result<Response<rustbase::Key>, Status> {
         let value: Document = bson::from_slice(&request.get_ref().value).unwrap();
-        self.database
-            .lock()
-            .unwrap()
-            .update(&request.get_ref().key, value)
-            .unwrap();
+        let key = &request.get_ref().key;
+        let mut dd = self.database.lock().unwrap();
+
+        if !dd.contains(key) {
+            return Err(Status::new(
+                tonic::Code::NotFound,
+                format!("Key not found: {}", request.get_ref().key),
+            ));
+        }
+
+        dd.update(&request.get_ref().key, value).unwrap();
 
         let response = rustbase::Key {
             key: request.get_ref().key.clone(),
@@ -79,15 +102,25 @@ impl Rustbase for DatabaseServer {
         &self,
         request: Request<rustbase::Key>,
     ) -> Result<Response<rustbase::Void>, Status> {
-        self.database
-            .lock()
-            .unwrap()
-            .delete(&request.get_ref().key)
-            .unwrap();
+        let key = &request.get_ref().key;
+        let mut dd = self.database.lock().unwrap();
 
-        let response = rustbase::Void {};
+        if !dd.contains(key) {
+            return Err(Status::new(
+                tonic::Code::NotFound,
+                format!("Key not found: {}", request.get_ref().key),
+            ));
+        }
 
-        Ok(Response::new(response))
+        let mut cache = self.cache.lock().unwrap();
+
+        if cache.contains(key.to_string()) {
+            cache.remove(key).ok();
+        }
+
+        dd.delete(key).unwrap();
+
+        Ok(Response::new(rustbase::Void {}))
     }
 }
 
@@ -103,6 +136,9 @@ pub async fn initalize_server(config: config::Config) {
                 flush_threshold: dustdata::Size::Megabytes(128),
             },
         }))),
+        cache: Arc::new(Mutex::new(super::cache::Cache::new(
+            config.database.cache_size,
+        ))),
     };
 
     println!("[Server] Listening on rustbase://{}", addr);
