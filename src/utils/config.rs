@@ -3,11 +3,14 @@ use std::fs;
 use std::io::Read;
 
 pub fn get_config() -> config::Config {
+    let exe = std::env::current_exe().unwrap();
+    let mut ancestors = std::path::Path::new(&exe).ancestors();
     let config_path = format!(
-        "{:?}/{}",
-        std::env::current_dir().unwrap(),
+        "{}/{}",
+        ancestors.nth(1).unwrap().to_str().unwrap(),
         crate::spec::DEFAULT_CONFIG_NAME
     );
+
     let mut file = fs::File::open(config_path).expect("Unable to open file");
     let mut config_data = String::new();
 

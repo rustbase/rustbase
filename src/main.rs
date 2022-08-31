@@ -35,9 +35,11 @@ fn load_config() -> config::Config {
     };
 
     // If has rustbase config, load it. Otherwise, use default config (and create a rustbase config).
+    let exe = std::env::current_exe().unwrap();
+    let mut ancestors = std::path::Path::new(&exe).ancestors();
     let config_path = format!(
         "{}/{}",
-        std::env::current_dir().unwrap().to_str().unwrap(),
+        ancestors.nth(1).unwrap().to_str().unwrap(),
         spec::DEFAULT_CONFIG_NAME
     );
 
