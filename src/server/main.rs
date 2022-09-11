@@ -1,6 +1,8 @@
 use crate::config;
 use bson::Document;
+use dustdata::{DustData, DustDataConfig, LsmConfig, Size};
 use rustbase::rustbase_server::{Rustbase, RustbaseServer};
+use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use tonic::{transport::Server, Request, Response, Status};
 
@@ -9,18 +11,65 @@ pub mod rustbase {
 }
 
 pub struct DatabaseServer {
-    database: Arc<Mutex<dustdata::DustData>>,
+    routers: Arc<Mutex<BTreeMap<String, DustData>>>,
+    // database: Arc<Mutex<dustdata::DustData>>,
     cache: Arc<Mutex<super::cache::Cache>>,
+    config: config::Config,
 }
-
 #[tonic::async_trait]
 impl Rustbase for DatabaseServer {
+    async fn create_database(
+        &self,
+        request: Request<rustbase::Database>,
+    ) -> Result<Response<rustbase::Void>, Status> {
+        let database_name = request.into_inner().name;
+
+        let mut routers = self.routers.lock().unwrap();
+
+        if routers.contains_key(&database_name) {
+            return Err(Status::already_exists("Database already exists"));
+        }
+
+        let config = default_dustdata_config(self.config.database.path.clone());
+
+        let dd = dustdata::initialize(config);
+
+        routers.insert(database_name, dd);
+
+        Ok(Response::new(rustbase::Void {}))
+    }
+
+    async fn delete_database(
+        &self,
+        request: Request<rustbase::Database>,
+    ) -> Result<Response<rustbase::Void>, Status> {
+        let database_name = request.into_inner().name;
+        let mut routers = self.routers.lock().unwrap();
+
+        if !routers.contains_key(&database_name) {
+            return Err(Status::not_found("Database not found"));
+        }
+
+        routers.remove(&database_name);
+
+        Ok(Response::new(rustbase::Void {}))
+    }
+
     async fn get(
         &self,
         request: Request<rustbase::Key>,
     ) -> Result<Response<rustbase::Bson>, Status> {
-        let mut cache = self.cache.lock().unwrap();
         let key = &request.get_ref().key;
+        let database_name = &request.get_ref().database;
+
+        let routers = self.routers.lock().unwrap();
+        let mut cache = self.cache.lock().unwrap();
+
+        if !routers.contains_key(database_name) {
+            return Err(Status::not_found("Database not found"));
+        }
+
+        let dd = routers.get(database_name).unwrap();
 
         if cache.contains(key.to_string()) {
             let value = cache.get(key).unwrap();
@@ -29,7 +78,6 @@ impl Rustbase for DatabaseServer {
             };
             return Ok(Response::new(response));
         } else {
-            let dd = self.database.lock().unwrap();
             let value = dd.get(&request.get_ref().key).unwrap();
 
             if value.is_none() {
@@ -53,10 +101,18 @@ impl Rustbase for DatabaseServer {
     async fn insert(
         &self,
         request: Request<rustbase::KeyValue>,
-    ) -> Result<Response<rustbase::Key>, Status> {
+    ) -> Result<Response<rustbase::Void>, Status> {
         let value: Document = bson::from_slice(&request.get_ref().value).unwrap();
         let key = &request.get_ref().key;
-        let mut dd = self.database.lock().unwrap();
+        let database_name = &request.get_ref().database;
+
+        let mut routers = self.routers.lock().unwrap();
+
+        if !routers.contains_key(database_name) {
+            return Err(Status::not_found("Database not found"));
+        }
+
+        let dd = routers.get_mut(database_name).unwrap();
 
         if dd.contains(key) {
             return Err(Status::new(
@@ -67,9 +123,7 @@ impl Rustbase for DatabaseServer {
 
         dd.insert(&request.get_ref().key, value).unwrap();
 
-        let response = rustbase::Key {
-            key: request.get_ref().key.clone(),
-        };
+        let response = rustbase::Void {};
 
         Ok(Response::new(response))
     }
@@ -77,10 +131,18 @@ impl Rustbase for DatabaseServer {
     async fn update(
         &self,
         request: Request<rustbase::KeyValue>,
-    ) -> Result<Response<rustbase::Key>, Status> {
+    ) -> Result<Response<rustbase::Void>, Status> {
         let value: Document = bson::from_slice(&request.get_ref().value).unwrap();
         let key = &request.get_ref().key;
-        let mut dd = self.database.lock().unwrap();
+        let database_name = &request.get_ref().database;
+
+        let mut routers = self.routers.lock().unwrap();
+
+        if !routers.contains_key(database_name) {
+            return Err(Status::not_found("Database not found"));
+        }
+
+        let dd = routers.get_mut(database_name).unwrap();
 
         if !dd.contains(key) {
             return Err(Status::new(
@@ -91,9 +153,7 @@ impl Rustbase for DatabaseServer {
 
         dd.update(&request.get_ref().key, value).unwrap();
 
-        let response = rustbase::Key {
-            key: request.get_ref().key.clone(),
-        };
+        let response = rustbase::Void {};
 
         Ok(Response::new(response))
     }
@@ -103,7 +163,15 @@ impl Rustbase for DatabaseServer {
         request: Request<rustbase::Key>,
     ) -> Result<Response<rustbase::Void>, Status> {
         let key = &request.get_ref().key;
-        let mut dd = self.database.lock().unwrap();
+        let database_name = &request.get_ref().database;
+
+        let mut routers = self.routers.lock().unwrap();
+
+        if !routers.contains_key(database_name) {
+            return Err(Status::not_found("Database not found"));
+        }
+
+        let dd = routers.get_mut(database_name).unwrap();
 
         if !dd.contains(key) {
             return Err(Status::new(
@@ -129,16 +197,20 @@ pub async fn initalize_server(config: config::Config) {
         .parse()
         .unwrap();
 
+    let mut routers = BTreeMap::new();
+
+    for route in get_existing_routes(config.database.path.clone()) {
+        let dd = dustdata::initialize(default_dustdata_config(config.database.path.clone()));
+
+        routers.insert(route, dd);
+    }
+
     let database_server = DatabaseServer {
-        database: Arc::new(Mutex::new(dustdata::initialize(dustdata::DustDataConfig {
-            path: config.database.path.clone(),
-            lsm_config: dustdata::LsmConfig {
-                flush_threshold: dustdata::Size::Megabytes(128),
-            },
-        }))),
         cache: Arc::new(Mutex::new(super::cache::Cache::new(
             config.database.cache_size,
         ))),
+        routers: Arc::new(Mutex::new(routers)),
+        config,
     };
 
     println!("[Server] Listening on rustbase://{}", addr);
@@ -148,4 +220,27 @@ pub async fn initalize_server(config: config::Config) {
         .serve(addr)
         .await
         .unwrap();
+}
+
+fn default_dustdata_config(data_path: String) -> DustDataConfig {
+    DustDataConfig {
+        path: data_path,
+        lsm_config: LsmConfig {
+            flush_threshold: Size::Megabytes(128),
+        },
+    }
+}
+
+fn get_existing_routes(data_path: String) -> Vec<String> {
+    let mut routes = Vec::new();
+
+    for entry in std::fs::read_dir(data_path).unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        let route = path.file_name().unwrap().to_str().unwrap().to_string();
+        println!("Found existing route: {}", route);
+        routes.push(route);
+    }
+
+    routes
 }

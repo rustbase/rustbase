@@ -4,20 +4,29 @@ package rustbase;
 
 service Rustbase {
     rpc Get(Key) returns (Bson) {}
-    rpc Insert(KeyValue) returns (Key) {}
-    rpc Update(KeyValue) returns (Key) {}
+    rpc Insert(KeyValue) returns (Void) {}
+    rpc Update(KeyValue) returns (Void) {}
     rpc Delete(Key) returns (Void) {}
+
+    rpc CreateDatabase(Database) returns (Void) {}
+    rpc DeleteDatabase(Database) returns (Void) {}
 }
 
 message Void {}
 
+message Database {
+    string name = 1;
+}
+
 message Key {
-    string key = 1;
+    string key = 1; // Key
+    string database = 2; // Database to use
 }
 
 message KeyValue {
-    string key = 1;
-    bytes value = 2;
+    string key = 1; // Key
+    string database = 2; // Database to use
+    bytes value = 3; // Value (in bson)
 }
 
 message Bson {

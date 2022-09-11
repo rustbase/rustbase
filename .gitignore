@@ -16,3 +16,6 @@ config.json
 
 # Windows resource file
 resource.rc
+
+# Useless
+repl.history

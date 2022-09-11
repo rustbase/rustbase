@@ -33,6 +33,11 @@ impl Cache {
     }
 
     pub fn insert(&mut self, key: String, value: bson::Document) -> CResult<()> {
+        if self.cache.contains_key(&key) {
+            return Err(CacheError {
+                code: CacheErrorCode::KeyExists,
+            });
+        }
         let value_size = std::mem::size_of_val(&value);
 
         if self.is_cache_full() || self.cache_size + value_size > self.max_size {
@@ -92,6 +97,8 @@ impl Cache {
     }
 
     fn manage_cache(&mut self, size_to_insert: usize) {
+        // remove oldest entry with size_to_insert
+
         let cache = self.cache.clone();
         let cache = cache.iter();
 
