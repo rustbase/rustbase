@@ -236,13 +236,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "dustdata"
-version = "0.2.8"
+name = "ctrlc"
+version = "3.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f85fe9bc4271bcac3c4935f235bb9b8b2efa68e1d33794690cd2b80abb99d01f"
+checksum = "1d91974fbbe88ec1df0c24a4f00f99583667a7e2e6272b2b92d294d81e462173"
+dependencies = [
+ "nix",
+ "winapi",
+]
+
+[[package]]
+name = "dustdata"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc149deb3a4d0dcc6a732f1a0ddf69ed39f02a26ab3b6b0c9c17af5e55a06195"
 dependencies = [
  "bitvec",
  "bson",
+ "ctrlc",
  "fasthash",
  "hex",
  "lzzzz",
@@ -625,6 +636,18 @@ name = "multimap"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5ce46fe64a9d73be07dcbe690a38ce1b293be448fd8ce1e6c1b8062c9f72c6a"
+
+[[package]]
+name = "nix"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e322c04a9e3440c327fca7b6c8a63e6890a32fa2ad689db972425f07e0d22abb"
+dependencies = [
+ "autocfg",
+ "bitflags",
+ "cfg-if 1.0.0",
+ "libc",
+]
 
 [[package]]
 name = "ntapi"

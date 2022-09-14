@@ -9,7 +9,7 @@ pub struct Cache {
 
 #[derive(Clone, Debug)]
 struct CacheNode {
-    value: bson::Document,
+    value: bson::Bson,
     size: usize,
     insert_at: std::time::SystemTime,
 }
@@ -23,7 +23,7 @@ impl Cache {
         }
     }
 
-    pub fn get(&self, key: &str) -> Option<&bson::Document> {
+    pub fn get(&self, key: &str) -> Option<&bson::Bson> {
         if !self.cache.contains_key(key) {
             return None;
         }
@@ -32,7 +32,7 @@ impl Cache {
         Some(value)
     }
 
-    pub fn insert(&mut self, key: String, value: bson::Document) -> CResult<()> {
+    pub fn insert(&mut self, key: String, value: bson::Bson) -> CResult<()> {
         if self.cache.contains_key(&key) {
             return Err(CacheError {
                 code: CacheErrorCode::KeyExists,

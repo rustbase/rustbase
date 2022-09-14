@@ -4,6 +4,7 @@ use dustdata::{DustData, DustDataConfig, LsmConfig, Size};
 use rustbase::rustbase_server::{Rustbase, RustbaseServer};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
+use std::{fs, path};
 use tonic::{transport::Server, Request, Response, Status};
 
 pub mod rustbase {
@@ -24,13 +25,23 @@ impl Rustbase for DatabaseServer {
     ) -> Result<Response<rustbase::Void>, Status> {
         let database_name = request.into_inner().name;
 
+        if database_name.is_empty() {
+            return Err(Status::invalid_argument("database name is empty"));
+        }
+
         let mut routers = self.routers.lock().unwrap();
 
         if routers.contains_key(&database_name) {
             return Err(Status::already_exists("Database already exists"));
         }
 
-        let config = default_dustdata_config(self.config.database.path.clone());
+        let config = default_dustdata_config(
+            path::Path::new(&self.config.database.path)
+                .join(&database_name)
+                .to_str()
+                .unwrap()
+                .to_string(),
+        );
 
         let dd = dustdata::initialize(config);
 
@@ -102,7 +113,7 @@ impl Rustbase for DatabaseServer {
         &self,
         request: Request<rustbase::KeyValue>,
     ) -> Result<Response<rustbase::Void>, Status> {
-        let value: Document = bson::from_slice(&request.get_ref().value).unwrap();
+        let value = bson::from_slice(&request.get_ref().value).unwrap();
         let key = &request.get_ref().key;
         let database_name = &request.get_ref().database;
 
@@ -132,7 +143,7 @@ impl Rustbase for DatabaseServer {
         &self,
         request: Request<rustbase::KeyValue>,
     ) -> Result<Response<rustbase::Void>, Status> {
-        let value: Document = bson::from_slice(&request.get_ref().value).unwrap();
+        let value = bson::from_slice(&request.get_ref().value).unwrap();
         let key = &request.get_ref().key;
         let database_name = &request.get_ref().database;
 
@@ -198,11 +209,20 @@ pub async fn initalize_server(config: config::Config) {
         .unwrap();
 
     let mut routers = BTreeMap::new();
+    let routes = get_existing_routes(config.database.path.clone());
 
-    for route in get_existing_routes(config.database.path.clone()) {
-        let dd = dustdata::initialize(default_dustdata_config(config.database.path.clone()));
+    if !routes.is_empty() {
+        for route in routes {
+            let dd = dustdata::initialize(default_dustdata_config(
+                path::Path::new(&config.database.path)
+                    .join(&route)
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+            ));
 
-        routers.insert(route, dd);
+            routers.insert(route, dd);
+        }
     }
 
     let database_server = DatabaseServer {
@@ -225,8 +245,9 @@ pub async fn initalize_server(config: config::Config) {
 fn default_dustdata_config(data_path: String) -> DustDataConfig {
     DustDataConfig {
         path: data_path,
+        verbose: true,
         lsm_config: LsmConfig {
-            flush_threshold: Size::Megabytes(128),
+            flush_threshold: Size::Megabytes(256),
         },
     }
 }
@@ -234,11 +255,15 @@ fn default_dustdata_config(data_path: String) -> DustDataConfig {
 fn get_existing_routes(data_path: String) -> Vec<String> {
     let mut routes = Vec::new();
 
+    if !path::Path::new(&data_path).exists() {
+        fs::create_dir_all(&data_path).unwrap();
+        return routes;
+    }
+
     for entry in std::fs::read_dir(data_path).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
         let route = path.file_name().unwrap().to_str().unwrap().to_string();
-        println!("Found existing route: {}", route);
         routes.push(route);
     }
 
