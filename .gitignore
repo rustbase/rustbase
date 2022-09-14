@@ -16,3 +16,4 @@ config.json
 
 # Windows resource file
 resource.rc
+/release
