@@ -1,4 +1,5 @@
 mod config;
+mod query;
 mod server;
 mod spec;
 mod utils;

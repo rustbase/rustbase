@@ -19,6 +19,8 @@ dustdata = "0.3.0"
 tonic = "0.8.0"
 prost = "0.11.0"
 num_cpus = "1.13.1"
+pest = "2.4.0"
+pest_derive = "2.4.0"
 
 
 [build-dependencies]

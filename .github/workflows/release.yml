@@ -28,9 +28,9 @@ jobs:
                   release_name: Rustbase ${{ github.ref }}
                   body: |
                       To update Rustbase
-                        ```bash
-                        rustbase upgrade
-                        ```
+                      ```bash
+                      rustbase upgrade
+                      ```
                   draft: false
                   prerelease: false
             - name: Upload Release Asset
