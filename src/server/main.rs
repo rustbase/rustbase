@@ -1,5 +1,4 @@
-use crate::config;
-use bson::Document;
+use crate::config::schema;
 use dustdata::{DustData, DustDataConfig, LsmConfig, Size};
 use rustbase::rustbase_server::{Rustbase, RustbaseServer};
 use std::collections::BTreeMap;
@@ -15,7 +14,7 @@ pub struct DatabaseServer {
     routers: Arc<Mutex<BTreeMap<String, DustData>>>,
     // database: Arc<Mutex<dustdata::DustData>>,
     cache: Arc<Mutex<super::cache::Cache>>,
-    config: config::Config,
+    config: schema::RustbaseConfig,
 }
 #[tonic::async_trait]
 impl Rustbase for DatabaseServer {
@@ -203,7 +202,7 @@ impl Rustbase for DatabaseServer {
     }
 }
 
-pub async fn initalize_server(config: config::Config) {
+pub async fn initalize_server(config: schema::RustbaseConfig) {
     let addr = format!("{}:{}", config.net.host, config.net.port)
         .parse()
         .unwrap();
