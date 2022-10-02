@@ -13,6 +13,8 @@ jobs:
         steps:
             - name: Checkout code
               uses: actions/checkout@v2
+            - name: Install Protoc
+              uses: arduino/setup-protoc@v1
             - name: Build project # This would actually build your project, using zip for an example artifact
               run: |
                   bash ./scripts/release.sh
@@ -26,9 +28,9 @@ jobs:
                   release_name: Rustbase ${{ github.ref }}
                   body: |
                       To update Rustbase
-                        ```bash
-                        rustbase upgrade
-                        ```
+                      ```bash
+                      rustbase upgrade
+                      ```
                   draft: false
                   prerelease: false
             - name: Upload Release Asset
