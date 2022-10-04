@@ -68,7 +68,7 @@ impl Display for Net {
 
 impl Display for Database {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "\nNetwork configuration: ")?;
+        writeln!(f, "\nDatabase configuration: ")?;
         writeln!(
             f,
             "{}cache_size: {}",
