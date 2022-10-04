@@ -44,7 +44,7 @@ fn parse_size_to_string(size: usize) -> String {
         unit = "TB";
     }
 
-    format!("{:.2} {} ({} B)", m_size, unit, size)
+    format!("{:.2} {} ({} Bytes)", m_size, unit, size)
 }
 
 const IDENT: &str = "    ";

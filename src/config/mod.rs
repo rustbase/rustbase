@@ -24,13 +24,17 @@ pub fn default_configuration() -> schema::RustbaseConfig {
 pub fn load_configuration() -> schema::RustbaseConfig {
     let mut config = default_configuration();
 
-    let config_file_name =
-        var("RUSTBASE_CONFIG_FILE").unwrap_or_else(|_| spec::DEFAULT_CONFIG_NAME.to_string());
-
-    let config_path = get_current_path().join(config_file_name.clone());
+    let config_path = if let Ok(config_file_name) = var("RUSTBASE_CONFIG_FILE") {
+        get_current_path().join(config_file_name)
+    } else {
+        get_current_path().join(spec::DEFAULT_CONFIG_NAME)
+    };
 
     if !config_path.exists() {
-        println!("[Config] {} not found", spec::DEFAULT_CONFIG_NAME.cyan());
+        println!(
+            "[Config] {} not found",
+            config_path.file_name().unwrap().to_str().unwrap().cyan()
+        );
 
         if var("RUSTBASE_CONFIG_FILE").is_err() {
             // env var not set
@@ -45,13 +49,13 @@ pub fn load_configuration() -> schema::RustbaseConfig {
 
             println!("[Config] {} created", spec::DEFAULT_CONFIG_NAME.cyan());
         } else {
-            panic!("{} not found", config_file_name);
+            panic!("{} not found", config_path.absolutize().unwrap().display());
         }
 
         return config;
     }
 
-    let file = File::open(config_path).unwrap();
+    let file = File::open(config_path.clone()).unwrap();
 
     config = match serde_json::from_reader(file) {
         Ok(config) => config,
@@ -81,7 +85,10 @@ pub fn load_configuration() -> schema::RustbaseConfig {
         .unwrap()
         .to_string();
 
-    println!("[Config] {} loaded", spec::DEFAULT_CONFIG_NAME.cyan());
+    println!(
+        "[Config] {} loaded",
+        config_path.file_name().unwrap().to_str().unwrap().cyan()
+    );
     println!("[Config] load config: {}", config);
 
     config
