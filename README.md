@@ -8,7 +8,17 @@ A noSQL key-value database cross-platform program written in [Rust](https://www.
 Join our [Discord server](https://discord.gg/m5ZzWPumbd) to get help and discuss features.
 
 # ⚠️ Warning
-This is a work in progress. *Current available only for Linux*.
+This is a work in progress.
+
+# Supported platforms
+| **Platform** | **is supported?** |
+| ------------ | ----------------- |
+| Windows      | Yes               |
+| Linux        | Yes               |
+| macOS        | No                |
+
+# Download
+You can download the latest version of Rustbase [here](https://github.com/rustbase/rustbase/releases)
 
 # Development Dependencies
 Because of `tonic` dependency, we need some extra dependencies to compile the program.
