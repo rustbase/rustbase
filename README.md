@@ -41,7 +41,7 @@ brew install protobuf
 - [Server](./src/server/)
     * [Cache](./src/server/cache/)
     * [Engine](./src/server/engine/)
-    * [Route](./src/server/Route/)
+    * [Route](./src/server/route/)
 - [Utils](./src/utils/)
 
 # Authors
