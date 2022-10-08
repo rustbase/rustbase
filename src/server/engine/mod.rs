@@ -51,7 +51,10 @@ impl Database {
 
     pub fn get(&self, query: query::parser::GetQuery, database: String) -> Response<QueryResult> {
         let mut cache = self.cache.lock().unwrap();
-        if cache.contains(query.key.clone()) {
+
+        let cache_key = format!("{}:{}", database, query.key);
+
+        if cache.contains(cache_key.clone()) {
             let v = cache.get(&query.key).unwrap().clone();
 
             return Response::new(QueryResult {
@@ -78,7 +81,7 @@ impl Database {
         let value = dd.get(&query.key).unwrap();
 
         if let Some(value) = value {
-            cache.insert(query.key, value.clone()).unwrap();
+            cache.insert(cache_key, value.clone()).unwrap();
 
             Response::new(QueryResult {
                 error_message: None,
@@ -141,7 +144,13 @@ impl Database {
         if routers.contains_key(&database) {
             let dd = routers.get_mut(&database).unwrap();
             dd.delete(&query.key).unwrap();
-            self.cache.lock().unwrap().remove(&query.key).unwrap();
+
+            let mut cache = self.cache.lock().unwrap();
+            let cache_key = format!("{}:{}", database, query.key);
+
+            if cache.contains(cache_key.clone()) {
+                cache.remove(&cache_key).unwrap();
+            }
 
             Response::new(QueryResult {
                 error_message: None,
