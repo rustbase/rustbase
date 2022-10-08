@@ -1,6 +1,9 @@
 # 86_64 Linux
+rustup target add x86_64-unknown-linux-gnu
 cargo build --target x86_64-unknown-linux-gnu --release
+
 # x86_64 Windows
+rustup target add x86_64-pc-windows-gnu
 cargo build --target x86_64-pc-windows-gnu --release
 
 mkdir -p release
