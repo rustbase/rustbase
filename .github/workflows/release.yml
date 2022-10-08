@@ -13,11 +13,16 @@ jobs:
         steps:
             - name: Checkout code
               uses: actions/checkout@v2
+
             - name: Install Protoc
               uses: arduino/setup-protoc@v1
+
             - name: Build project # This would actually build your project, using zip for an example artifact
               run: |
                   bash ./scripts/release.sh
+            - name: Install MinGW
+              uses: egor-tensin/setup-mingw@v2
+
             - name: Create Release
               id: create_release
               uses: actions/create-release@v1
@@ -33,6 +38,7 @@ jobs:
                       ```
                   draft: false
                   prerelease: false
+
             - name: Upload Linux artifact
               id: upload-linux
               uses: actions/upload-release-asset@v1
@@ -43,6 +49,7 @@ jobs:
                   asset_path: ./release/rustbase-linux-x64.zip
                   asset_name: rustbase-linux-x64.zip
                   asset_content_type: application/zip
+
             - name: Upload Windows artifact
               id: upload-windows
               uses: actions/upload-release-asset@v1
