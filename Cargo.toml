@@ -4,8 +4,6 @@ version = "0.1.2-beta"
 edition = "2021"
 build = "./src/build.rs"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 serde = { version = "1.0.144", features = ["derive"] }
 serde_json = "1.0"
@@ -35,6 +33,3 @@ LegalCopyright = "Rustbase © 2022, The Rustbase Project Developers"
 ProductName = "Rustbase Database"
 ProductVersion = "0.1.0-beta"
 FileDescription = "Rustbase Database Server"
-
-[package.metadata]
-VersionCode = "Nabla"

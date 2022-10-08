@@ -30,13 +30,13 @@ number = @{
 json = _{ value }
 
 d_get = _{ "get" }
-d_set = _{ "set" }
+d_insert = _{ "insert" }
 d_update = _{ "update" | "upd" }
 d_delete = _{ "delete" | "del" }
 
-insert = { SOI ~ d_set ~ json ~ "in" ~ inner ~ EOI}
+insert = { SOI ~ d_insert ~ json ~ "in" ~ inner ~ EOI}
 update = { SOI ~ d_update ~ json ~ "in" ~ inner ~ EOI}
 delete = { SOI ~ d_delete ~ inner ~ EOI}
 get = { SOI ~ d_get ~ inner ~ EOI}
 
-crud = _{insert | update | delete | get}
+crud = _{insert | get | update | delete}

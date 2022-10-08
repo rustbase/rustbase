@@ -1,4 +1,4 @@
-pub mod parse;
+pub mod parser;
 
 type Result<T> = std::result::Result<T, QueryError>;
 
@@ -8,4 +8,4 @@ pub enum QueryErrorType {
 }
 
 #[derive(Debug)]
-pub struct QueryError(QueryErrorType, String); // type and message
+pub struct QueryError(pub QueryErrorType, pub String); // type and message

@@ -82,6 +82,7 @@ impl Cache {
 
     fn is_cache_full(&self) -> bool {
         if self.cache_size >= self.max_size {
+            println!("[Cache] The cache is full");
             return true;
         }
 
@@ -97,6 +98,8 @@ impl Cache {
     }
 
     fn manage_cache(&mut self, size_to_insert: usize) {
+        println!("[Cache] Removing old data");
+        let current_size = self.cache_size;
         // remove oldest entry with size_to_insert
 
         let cache = self.cache.clone();
@@ -109,6 +112,11 @@ impl Cache {
 
         let (key, _) = cache.pop().unwrap();
         self.remove(key).unwrap();
+
+        println!(
+            "[Cache] {} Bytes has been flushed",
+            current_size - self.cache_size
+        );
     }
 }
 
