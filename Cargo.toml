@@ -1,6 +1,6 @@
 [package]
 name = "rustbase"
-version = "0.1.3-beta"
+version = "0.1.4-beta"
 edition = "2021"
 build = "./src/build.rs"
 
@@ -31,5 +31,5 @@ tonic-build = "0.8.0"
 OriginalFilename = "rustbase.exe"
 LegalCopyright = "Rustbase © 2022, The Rustbase Project Developers"
 ProductName = "Rustbase Database"
-ProductVersion = "0.1.3-beta"
+ProductVersion = "0.1.4-beta"
 FileDescription = "Rustbase Database Server"

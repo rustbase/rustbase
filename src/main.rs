@@ -16,7 +16,7 @@ async fn main() {
     println!("{}", "Welcome to Rustbase Database Server!".bold());
     println!(
         "Current version: {} ({})",
-        std::env::var("VERSION_CODE").unwrap().green(),
+        env!("VERSION_CODE").green(),
         env!("CARGO_PKG_VERSION").cyan()
     );
     println!();

@@ -1,5 +1,5 @@
 fn main() {
-    if cfg!(target_os = "windows") {
+    if cfg!(windows) {
         extern crate winres;
         let mut winresouces = winres::WindowsResource::new();
 
@@ -11,4 +11,9 @@ fn main() {
         .protoc_arg("--experimental_allow_proto3_optional")
         .compile(&["proto/rustbase.proto"], &["proto"])
         .unwrap();
+
+    println!(
+        "cargo:rustc-env=VERSION_CODE={}",
+        std::env::var("VERSION_CODE").unwrap()
+    );
 }
