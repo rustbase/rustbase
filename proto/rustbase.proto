@@ -3,32 +3,24 @@ syntax = "proto3";
 package rustbase;
 
 service Rustbase {
-    rpc Get(Key) returns (Bson) {}
-    rpc Insert(KeyValue) returns (Void) {}
-    rpc Update(KeyValue) returns (Void) {}
-    rpc Delete(Key) returns (Void) {}
-
-    rpc CreateDatabase(Database) returns (Void) {}
-    rpc DeleteDatabase(Database) returns (Void) {}
+    rpc Query(QueryMessage) returns (QueryResult) {}
 }
 
-message Void {}
-
-message Database {
-    string name = 1;
+message QueryMessage {
+    string query = 1;
+    string database = 2;
 }
 
-message Key {
-    string key = 1; // Key
-    string database = 2; // Database to use
+enum QueryResultType {
+    OK = 0;
+    NOT_FOUND = 1;
+    ERROR = 2;
+    SYNTAX_ERROR = 3;
 }
 
-message KeyValue {
-    string key = 1; // Key
-    string database = 2; // Database to use
-    bytes value = 3; // Value (in bson)
-}
-
-message Bson {
-    bytes bson = 1;
+message QueryResult {
+    QueryResultType result_type = 1;   
+    optional string message = 2;
+    optional bytes bson = 3;
+    optional string error_message = 4;
 }

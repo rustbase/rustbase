@@ -3,6 +3,7 @@ use bson::{Bson, Document};
 use pest::iterators::Pair;
 use pest::Parser;
 
+#[derive(Debug)]
 pub enum Query {
     Get(GetQuery),
     Insert(InsertQuery),
@@ -10,20 +11,24 @@ pub enum Query {
     Delete(DeleteQuery),
 }
 
+#[derive(Debug)]
 pub struct GetQuery {
     pub key: String,
 }
 
+#[derive(Debug)]
 pub struct InsertQuery {
     pub key: String,
     pub value: Bson,
 }
 
+#[derive(Debug)]
 pub struct UpdateQuery {
     pub key: String,
     pub value: Bson,
 }
 
+#[derive(Debug)]
 pub struct DeleteQuery {
     pub key: String,
 }
@@ -87,8 +92,8 @@ pub fn parse(input: String) -> Result<Query> {
         match pair.as_rule() {
             Rule::insert => {
                 let mut inner_rules = pair.into_inner();
-                let key = inner_rules.next().unwrap().as_str().to_string();
                 let value = parse_to_bson(inner_rules.next().unwrap());
+                let key = inner_rules.next().unwrap().as_str().to_string();
                 return Ok(Query::Insert(InsertQuery { key, value }));
             }
 
