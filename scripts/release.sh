@@ -1,28 +1,73 @@
-# 86_64 Linux
-rustup target add x86_64-unknown-linux-gnu
-cargo build --target x86_64-unknown-linux-gnu --release
+#!/bin/bash
 
-# x86_64 Windows
-rustup target add x86_64-pc-windows-gnu
-cargo build --target x86_64-pc-windows-gnu --release
+only_target=$1
 
-mkdir -p release
+case "$only_target" in
+    *-linux*)
+        echo "Building only for Linux"
+        only_target="linux"
+        ;;
+
+    *-windows*)
+        echo "Building only for Windows"
+        only_target="windows"
+        ;;
+
+    *-macos*)
+        echo "Building only for Mac OS"
+        only_target="macos"
+        ;;
+
+    *)
+        echo "Building for all targets"
+        only_target=""
+        ;;
+esac
+
+targets=("x86_64-unknown-linux-gnu" "i686-unknown-linux-gnu" "x86_64-pc-windows-gnu" "i686-pc-windows-gnu")
+short_targets=("linux-x64" "linux-x86" "windows-x64" "windows-x86")
+
+for t in "${targets[@]}"; do
+    if [ "$only_target" != "" ] && [[ "$t" != *"$only_target"* ]]; then
+        continue
+    fi
+
+    echo "[+] Building for $t"
+    # ignore informational messages
+    rustup target add $t > /dev/null 2>&1
+
+    cargo build -q --target $t --release
+
+    echo "[Done] Building for $t"
+done
+
 bin_name=rustbase
 
-# 86_64 Linux
-cp target/x86_64-unknown-linux-gnu/release/$bin_name release/
+for t in "${!targets[@]}"; do
+    target=${targets[$t]}
+    short=${short_targets[$t]}
 
-zip -jq release/$bin_name.zip release/$bin_name
+    if [ "$only_target" != "" ] && [[ "$target" != *"$only_target"* ]]; then
+        continue
+    fi
 
-mv release/$bin_name.zip release/$bin_name-linux-x64.zip
 
-rm -rf release/$bin_name
+    echo "[+] Packaging for $short"
 
-# x86_64 Windows
-cp target/x86_64-pc-windows-gnu/release/$bin_name.exe release/
+    if [[ "$short" == *"windows"* ]]; then
+        target_bin=rustbase.exe
+     else
+        target_bin=rustbase
+    fi
 
-zip -jq release/$bin_name.zip release/$bin_name.exe
+    mkdir -p release
+    cp target/$target/release/$target_bin release/
+    zip -jq release/$bin_name.zip release/$target_bin
+    mv release/$bin_name.zip release/$bin_name-$short.zip
 
-mv release/$bin_name.zip release/$bin_name-windows-x64.zip
+    rm -rf release/$target_bin
 
-rm -rf release/$bin_name.exe
+    echo "[Done] Packaged for $short"
+done
+
+echo "[+] Done"

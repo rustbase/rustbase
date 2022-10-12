@@ -7,8 +7,8 @@ on:
 name: Release
 
 jobs:
-    build:
-        name: Release
+    build-linux:
+        name: Releasing Linux
         runs-on: ubuntu-latest
         steps:
             - name: Checkout code
@@ -17,46 +17,55 @@ jobs:
             - name: Install Protoc
               uses: arduino/setup-protoc@v1
 
-            - name: Build project # This would actually build your project, using zip for an example artifact
+            - name: Install latest rust toolchain
+              uses: actions-rs/toolchain@v1
+              with:
+                  toolchain: stable
+                  default: true
+                  override: true
+
+            - name: Build project
               run: |
-                  bash ./scripts/release.sh
-            - name: Install MinGW
-              uses: egor-tensin/setup-mingw@v2
+                  bash ./scripts/release.sh --only-linux
 
-            - name: Create Release
-              id: create_release
-              uses: actions/create-release@v1
+            - name: Release
+              uses: softprops/action-gh-release@v1
+              if: startsWith(github.ref, 'refs/tags/')
+              with:
+                  files: |
+                      release/rustbase-linux-x64.zip
+                      release/rustbase-linux-x86.zip
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              with:
-                  tag_name: ${{ github.ref }}
-                  release_name: Rustbase ${{ github.ref }}
-                  body: |
-                      To update Rustbase
-                      ```bash
-                      rustbase upgrade
-                      ```
-                  draft: false
-                  prerelease: false
 
-            - name: Upload Linux artifact
-              id: upload-linux
-              uses: actions/upload-release-asset@v1
+    build-windows:
+        name: Releasing Windows
+        runs-on: windows-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v2
+
+            - name: Install Protoc
+              uses: arduino/setup-protoc@v1
+
+            - name: Install latest rust toolchain
+              uses: actions-rs/toolchain@v1
+              with:
+                  toolchain: stable
+                  default: true
+                  override: true
+
+            - name: Build project
+              run: |
+                  bash ./scripts/release.sh --only-windows
+
+            - name: Release
+              uses: softprops/action-gh-release@v1
+              if: startsWith(github.ref, 'refs/tags/')
+              with:
+                  files: |
+                      release/rustbase-windows-x64.zip
+                      release/rustbase-windows-x86.zip
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              with:
-                  upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-                  asset_path: ./release/rustbase-linux-x64.zip
-                  asset_name: rustbase-linux-x64.zip
-                  asset_content_type: application/zip
-
-            - name: Upload Windows artifact
-              id: upload-windows
-              uses: actions/upload-release-asset@v1
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              with:
-                  upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
-                  asset_path: ./release/rustbase-windows-x64.zip
-                  asset_name: rustbase-windows-x64.zip
-                  asset_content_type: application/zip
