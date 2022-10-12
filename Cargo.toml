@@ -13,7 +13,7 @@ tokio = { version = "1.17.0", features = ["full"] }
 chrono = { version = "0.4.19", features = ["serde"] }
 hex = "0.4.3"
 bson = "2.4.0"
-dustdata = "0.3.1"
+dustdata = "0.3.2"
 tonic = "0.8.0"
 prost = "0.11.0"
 colored = "2.0.0"

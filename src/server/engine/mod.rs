@@ -167,4 +167,31 @@ impl Database {
             })
         }
     }
+
+    pub fn list(&self, database: String) -> Response<QueryResult> {
+        let mut routers = self.routers.lock().unwrap();
+
+        if routers.contains_key(&database) {
+            let dd = routers.get_mut(&database).unwrap();
+            let list = dd.list_keys().unwrap();
+
+            let doc = bson::doc! {
+                "_l": list
+            };
+
+            Response::new(QueryResult {
+                error_message: None,
+                result_type: QueryResultType::Ok as i32,
+                bson: Some(to_vec(&doc).unwrap()),
+                message: None,
+            })
+        } else {
+            Response::new(QueryResult {
+                error_message: Some("database.notFound".to_string()),
+                result_type: QueryResultType::NotFound as i32,
+                bson: None,
+                message: None,
+            })
+        }
+    }
 }

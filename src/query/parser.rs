@@ -9,6 +9,7 @@ pub enum Query {
     Insert(InsertQuery),
     Update(UpdateQuery),
     Delete(DeleteQuery),
+    List,
 }
 
 #[derive(Debug)]
@@ -113,6 +114,8 @@ pub fn parse(input: String) -> Result<Query> {
                 let key = pair.into_inner().next().unwrap().as_str().to_string();
                 return Ok(Query::Delete(DeleteQuery { key }));
             }
+
+            Rule::list => return Ok(Query::List),
 
             _ => {
                 unreachable!()

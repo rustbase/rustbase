@@ -37,6 +37,7 @@ impl Rustbase for Database {
             Query::Get(query) => self.get(query, database),
             Query::Update(query) => self.update(query, database),
             Query::Delete(query) => self.delete(query, database),
+            Query::List => self.list(database),
         };
 
         Ok(response)
