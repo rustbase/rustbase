@@ -1,6 +1,6 @@
+use super::engine::Workers;
 use crate::config::schema;
 use crate::query;
-use crate::server::engine::Database;
 use crate::server::route;
 use dustdata::{DustData, DustDataConfig, LsmConfig, Size};
 use query::parser::Query;
@@ -11,6 +11,10 @@ use tonic::{transport::Server, Request, Response, Status};
 
 pub mod rustbase {
     tonic::include_proto!("rustbase");
+}
+
+pub struct Database {
+    workers: Arc<tokio::sync::Mutex<Workers>>,
 }
 
 #[tonic::async_trait]
@@ -32,15 +36,10 @@ impl Rustbase for Database {
 
         let query = query::parser::parse(message).unwrap();
 
-        let response = match query {
-            Query::Insert(query) => self.insert(query, database),
-            Query::Get(query) => self.get(query, database),
-            Query::Update(query) => self.update(query, database),
-            Query::Delete(query) => self.delete(query, database),
-            Query::List => self.list(database),
-        };
+        let response =
+            Workers::process(self.workers.clone(), database.clone(), query.clone()).await;
 
-        Ok(response)
+        Ok(Response::new(response))
     }
 }
 
@@ -55,9 +54,7 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
     )));
 
     let database_server = Database {
-        cache,
-        routers,
-        config,
+        workers: Workers::new(routers, cache, config).await,
     };
 
     println!("[Server] Listening on rustbase://{}", addr);

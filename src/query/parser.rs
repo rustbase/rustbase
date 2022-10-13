@@ -3,7 +3,7 @@ use bson::{Bson, Document};
 use pest::iterators::Pair;
 use pest::Parser;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Query {
     Get(GetQuery),
     Insert(InsertQuery),
@@ -12,24 +12,24 @@ pub enum Query {
     List,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GetQuery {
     pub key: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InsertQuery {
     pub key: String,
     pub value: Bson,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UpdateQuery {
     pub key: String,
     pub value: Bson,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DeleteQuery {
     pub key: String,
 }

@@ -21,6 +21,7 @@ path-absolutize = "3.0.13"
 num_cpus = "1.13.1"
 pest = "2.4.0"
 pest_derive = "2.4.0"
+rand = "0.8.5"
 
 
 [build-dependencies]
