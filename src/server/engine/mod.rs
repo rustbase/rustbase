@@ -41,14 +41,14 @@ impl Workers {
         let _s = Self {
             routers,
             cache,
-            config,
+            config: config.clone(),
             queue: Arc::new(TMutex::new(Vec::new())),
             processed_queue: Arc::new(TMutex::new(BTreeMap::new())),
         };
 
         let _s = Arc::new(TMutex::new(_s));
 
-        Workers::work(_s.clone(), 4);
+        Workers::work(_s.clone(), config.database.threads);
 
         _s
     }

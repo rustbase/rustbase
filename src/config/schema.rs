@@ -18,6 +18,7 @@ pub struct Net {
 pub struct Database {
     pub path: String,
     pub cache_size: usize,
+    pub threads: usize,
 }
 
 fn parse_size_to_string(size: usize) -> String {
