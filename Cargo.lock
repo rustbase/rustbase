@@ -303,9 +303,9 @@ dependencies = [
 
 [[package]]
 name = "dustdata"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c476c9bb6bd6ad10022d073e18463792923e3ad681adb2216acbad3b8788f0a"
+checksum = "2fcb0c6dbf03dafeb424b70b08409b42db516fcbbc0a37388b6de3534600659e"
 dependencies = [
  "bitvec",
  "bson",

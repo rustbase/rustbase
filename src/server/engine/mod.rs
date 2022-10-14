@@ -16,7 +16,6 @@ use std::{
 };
 use tokio::spawn;
 use tokio::sync::Mutex as TMutex;
-use tonic::Response;
 
 #[derive(Clone)]
 pub struct Workers {
@@ -124,7 +123,25 @@ impl Workers {
         let mut routers = self.routers.lock().unwrap();
 
         if let Some(dd) = routers.get_mut(&database) {
-            dd.insert(&query.key, query.value).unwrap();
+            if dd.contains(&query.key) {
+                return QueryResult {
+                    error_message: Some(dd_error_code_to_string(dustdata::ErrorCode::KeyExists)),
+                    result_type: QueryResultType::Error as i32,
+                    bson: None,
+                    message: None,
+                };
+            }
+
+            let insert = dd.insert(&query.key, query.value);
+
+            if insert.is_err() {
+                return QueryResult {
+                    result_type: QueryResultType::Error as i32,
+                    error_message: Some(dd_error_code_to_string(insert.err().unwrap().code)),
+                    bson: None,
+                    message: None,
+                };
+            }
         } else {
             let mut dd = create_dustdata(
                 Path::new(&self.config.database.path)
@@ -188,8 +205,8 @@ impl Workers {
             }
         } else {
             QueryResult {
-                error_message: None,
                 result_type: QueryResultType::NotFound as i32,
+                error_message: Some(dd_error_code_to_string(dustdata::ErrorCode::KeyNotExists)),
                 bson: None,
                 message: None,
             }
@@ -207,7 +224,26 @@ impl Workers {
 
         if routers.contains_key(&database) {
             let dd = routers.get_mut(&database).unwrap();
-            dd.update(&query.key, query.value.clone()).unwrap();
+
+            if !dd.contains(&query.key) {
+                return QueryResult {
+                    error_message: Some(dd_error_code_to_string(dustdata::ErrorCode::KeyNotExists)),
+                    result_type: QueryResultType::NotFound as i32,
+                    bson: None,
+                    message: None,
+                };
+            }
+
+            let update = dd.update(&query.key, query.value.clone());
+
+            if update.is_err() {
+                return QueryResult {
+                    error_message: Some(dd_error_code_to_string(update.err().unwrap().code)),
+                    result_type: QueryResultType::Error as i32,
+                    bson: None,
+                    message: None,
+                };
+            }
 
             cache.insert(query.key, query.value).unwrap();
 
@@ -232,7 +268,26 @@ impl Workers {
 
         if routers.contains_key(&database) {
             let dd = routers.get_mut(&database).unwrap();
-            dd.delete(&query.key).unwrap();
+
+            if !dd.contains(&query.key) {
+                return QueryResult {
+                    error_message: Some(dd_error_code_to_string(dustdata::ErrorCode::KeyNotExists)),
+                    result_type: QueryResultType::NotFound as i32,
+                    bson: None,
+                    message: None,
+                };
+            }
+
+            let delete = dd.delete(&query.key);
+
+            if delete.is_err() {
+                return QueryResult {
+                    error_message: Some(dd_error_code_to_string(delete.err().unwrap().code)),
+                    result_type: QueryResultType::Error as i32,
+                    bson: None,
+                    message: None,
+                };
+            }
 
             let mut cache = self.cache.lock().unwrap();
             let cache_key = format!("{}:{}", database, query.key);
@@ -282,5 +337,13 @@ impl Workers {
                 message: None,
             }
         }
+    }
+}
+
+pub fn dd_error_code_to_string(code: dustdata::ErrorCode) -> String {
+    match code {
+        dustdata::ErrorCode::KeyExists => "key.alreadyExists".to_string(),
+        dustdata::ErrorCode::KeyNotExists => "key.notExists".to_string(),
+        dustdata::ErrorCode::NotFound => "notFound".to_string(),
     }
 }
