@@ -169,7 +169,7 @@ impl Workers {
         let cache_key = format!("{}:{}", database, query.key);
 
         if cache.contains(cache_key.clone()) {
-            let v = cache.get(&query.key).unwrap().clone();
+            let v = cache.get(&cache_key).unwrap().clone();
 
             return QueryResult {
                 error_message: None,
