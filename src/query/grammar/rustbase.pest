@@ -33,10 +33,12 @@ d_get = _{ "get" }
 d_insert = _{ "insert" }
 d_update = _{ "update" | "upd" }
 d_delete = _{ "delete" | "del" }
+d_list = _{ "list" | "ls" }
 
 insert = { SOI ~ d_insert ~ json ~ "in" ~ inner ~ EOI}
 update = { SOI ~ d_update ~ json ~ "in" ~ inner ~ EOI}
 delete = { SOI ~ d_delete ~ inner ~ EOI}
 get = { SOI ~ d_get ~ inner ~ EOI}
+list = { SOI ~ d_list ~ EOI}
 
-crud = _{insert | get | update | delete}
+crud = _{insert | get | update | delete | list}

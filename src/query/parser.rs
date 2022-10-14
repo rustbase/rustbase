@@ -3,32 +3,33 @@ use bson::{Bson, Document};
 use pest::iterators::Pair;
 use pest::Parser;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Query {
     Get(GetQuery),
     Insert(InsertQuery),
     Update(UpdateQuery),
     Delete(DeleteQuery),
+    List,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GetQuery {
     pub key: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InsertQuery {
     pub key: String,
     pub value: Bson,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UpdateQuery {
     pub key: String,
     pub value: Bson,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DeleteQuery {
     pub key: String,
 }
@@ -113,6 +114,8 @@ pub fn parse(input: String) -> Result<Query> {
                 let key = pair.into_inner().next().unwrap().as_str().to_string();
                 return Ok(Query::Delete(DeleteQuery { key }));
             }
+
+            Rule::list => return Ok(Query::List),
 
             _ => {
                 unreachable!()

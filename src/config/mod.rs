@@ -16,6 +16,7 @@ pub fn default_configuration() -> schema::RustbaseConfig {
         },
         database: schema::Database {
             path: "./data".to_string(),
+            threads: num_cpus::get(),
             cache_size: spec::DEFAULT_CACHE_SIZE,
         },
     }
