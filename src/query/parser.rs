@@ -10,6 +10,7 @@ pub enum Query {
     Update(UpdateQuery),
     Delete(DeleteQuery),
     List,
+    None,
 }
 
 #[derive(Debug, Clone)]

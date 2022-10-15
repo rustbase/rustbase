@@ -5,7 +5,6 @@ use super::main::{
 use crate::{
     config::schema,
     query::{self, parser::Query},
-    utils::crypto::generate_random_string,
 };
 use bson::to_vec;
 use dustdata::DustData;
@@ -14,107 +13,81 @@ use std::{
     path::Path,
     sync::{Arc, Mutex},
 };
-use tokio::spawn;
-use tokio::sync::Mutex as TMutex;
+use tokio::{
+    spawn,
+    sync::{mpsc, watch, Mutex as TMutex},
+};
 
-#[derive(Clone)]
-pub struct Workers {
+pub struct DatabaseEngine {
     pub routers: Arc<Mutex<BTreeMap<String, DustData>>>,
     pub cache: Arc<Mutex<super::cache::Cache>>,
     pub config: schema::RustbaseConfig,
-    pub queue: Arc<TMutex<Vec<QueueItem>>>,
-    pub processed_queue: Arc<TMutex<BTreeMap<String, QueryResult>>>,
+    pub in_receiver: watch::Receiver<(Query, String)>,
+    pub out_sender: mpsc::Sender<QueryResult>,
 }
 
-pub struct QueueItem {
-    pub id: String,
+pub struct QueryDatabase {
     pub query: Query,
     pub database: String,
 }
-
-impl Workers {
+impl DatabaseEngine {
     pub async fn new(
         routers: Arc<Mutex<BTreeMap<String, DustData>>>,
         cache: Arc<Mutex<super::cache::Cache>>,
         config: schema::RustbaseConfig,
-    ) -> Arc<TMutex<Self>> {
-        let _s = Self {
+    ) -> (
+        Self,
+        watch::Sender<(Query, String)>,
+        mpsc::Receiver<QueryResult>,
+    ) {
+        let (in_sender, in_receiver) = watch::channel((Query::None, "".to_string()));
+        let (out_sender, out_receiver) = mpsc::channel(32);
+
+        let _self = Self {
             routers,
             cache,
-            config: config.clone(),
-            queue: Arc::new(TMutex::new(Vec::new())),
-            processed_queue: Arc::new(TMutex::new(BTreeMap::new())),
+            config,
+            in_receiver,
+            out_sender,
         };
 
-        let _s = Arc::new(TMutex::new(_s));
-
-        Workers::work(_s.clone(), config.database.threads);
-
-        _s
+        (_self, in_sender, out_receiver)
     }
 
-    pub fn work(this: Arc<TMutex<Self>>, thread_size: usize) {
-        for _ in 0..thread_size {
+    pub async fn run(this: Arc<TMutex<Self>>, thread_size: usize) {
+        for i in 0..thread_size {
             let this = this.clone();
             spawn(async move {
+                let mut this = this.lock().await;
                 loop {
-                    let this = this.lock().await;
-                    let mut queue = this.queue.lock().await;
-
-                    if queue.len() > 0 {
-                        let item = queue.remove(0);
-
-                        let database = item.database;
-                        let query = item.query;
-                        let id = item.id;
-
-                        let response = match query {
-                            Query::Insert(query) => this.insert(query, database),
-                            Query::Get(query) => this.get(query, database),
-                            Query::Update(query) => this.update(query, database),
-                            Query::Delete(query) => this.delete(query, database),
-                            Query::List => this.list(database),
-                        };
-
-                        this.processed_queue.lock().await.insert(id, response);
+                    if this.in_receiver.changed().await.is_err() {
+                        break;
                     }
+
+                    let query = this.in_receiver.borrow_and_update().clone();
+
+                    let result = this.query(query.0, query.1);
+
+                    this.out_sender.send(result).await.unwrap();
                 }
             });
         }
     }
 
-    pub async fn add_to_worker(&self, database: String, query: Query) -> String {
-        let mut queue = self.queue.lock().await;
-        let id = generate_random_string(20);
-        queue.push(QueueItem {
-            query,
-            database,
-            id: id.clone(),
-        });
-
-        id
-    }
-
-    pub async fn process(this: Arc<TMutex<Self>>, database: String, query: Query) -> QueryResult {
-        let id = this
-            .clone()
-            .lock()
-            .await
-            .add_to_worker(database, query)
-            .await;
-
-        spawn(async move {
-            loop {
-                let this = this.lock().await;
-                let queue = this.processed_queue.lock().await;
-
-                if queue.contains_key(&id) {
-                    return queue.get(&id).unwrap().clone();
-                }
-            }
-        })
-        .await
-        .unwrap()
+    pub fn query(&self, query: Query, database: String) -> QueryResult {
+        match query {
+            Query::Delete(query) => self.delete(query, database),
+            Query::Insert(query) => self.insert(query, database),
+            Query::Get(query) => self.get(query, database),
+            Query::Update(query) => self.update(query, database),
+            Query::List => self.list(database),
+            Query::None => QueryResult {
+                message: None,
+                error_message: Some("No query provided".to_string()),
+                result_type: QueryResultType::SyntaxError as i32,
+                bson: None,
+            },
+        }
     }
 
     // --
