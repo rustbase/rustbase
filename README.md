@@ -1,11 +1,16 @@
 <div align="center">
-    <img src="https://github.com/rustbase.png?size=115">
-</div>
 
-# Rustbase
+<img src="https://github.com/rustbase.png?size=115">
+    
+<h1>
+Rustbase
+</h1>
+
 A noSQL key-value database cross-platform program written in [Rust](https://www.rust-lang.org/)
 
-Join our [Discord server](https://discord.gg/m5ZzWPumbd) to get help and discuss features.
+</div>
+
+<br />
 
 # ⚠️ Warning
 This is a work in progress.
@@ -42,8 +47,11 @@ brew install protobuf
 [Reference](https://github.com/hyperium/tonic#dependencies)
 
 
+
 # 🔗 Contribute
 [Click here](./CONTRIBUTING.md) to see how to Contribute
+
+Join our [Discord server](https://discord.gg/m5ZzWPumbd) to get help and discuss features.
 
 # Components
 - [Config](./src/config/)
@@ -65,3 +73,5 @@ brew install protobuf
 
 # License
 [MIT License](./LICENSE)
+
+
