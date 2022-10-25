@@ -1,5 +1,3 @@
-pub mod crypto;
-
 use std::path::{Path, PathBuf};
 
 pub fn get_current_path() -> PathBuf {
