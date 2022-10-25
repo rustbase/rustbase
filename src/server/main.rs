@@ -1,9 +1,8 @@
-use super::engine::DatabaseEngine;
 use crate::config::schema;
 use crate::query;
+use crate::server::engine::worker_manager::WorkerManager;
 use crate::server::route;
 use dustdata::{DustData, DustDataConfig, LsmConfig, Size};
-use query::parser::Query;
 use rustbase::rustbase_server::{Rustbase, RustbaseServer};
 use rustbase::{QueryMessage, QueryResult, QueryResultType};
 use std::sync::{Arc, Mutex};
@@ -15,9 +14,7 @@ pub mod rustbase {
 }
 
 pub struct Database {
-    pub engine: Arc<TMutex<DatabaseEngine>>,
-    pub in_sender: tokio::sync::watch::Sender<(Query, String)>,
-    pub out_receiver: TMutex<tokio::sync::mpsc::Receiver<QueryResult>>,
+    worker_manager: Arc<TMutex<WorkerManager>>,
 }
 
 #[tonic::async_trait]
@@ -39,8 +36,12 @@ impl Rustbase for Database {
 
         let query = query::parser::parse(message).unwrap();
 
-        self.in_sender.send((query, database)).unwrap();
-        let result = self.out_receiver.lock().await.recv().await.unwrap();
+        let result = self
+            .worker_manager
+            .lock()
+            .await
+            .process(query, database)
+            .await;
 
         Ok(Response::new(result))
     }
@@ -56,16 +57,10 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
         config.database.cache_size,
     )));
 
-    let engine = DatabaseEngine::new(routers, cache, config.clone()).await;
-
-    let am_engine = Arc::new(TMutex::new(engine.0));
-
-    DatabaseEngine::run(am_engine.clone(), config.database.threads).await;
+    let manager = WorkerManager::new(routers, cache, config.clone(), config.database.threads).await;
 
     let database_server = Database {
-        engine: am_engine,
-        in_sender: engine.1,
-        out_receiver: TMutex::new(engine.2),
+        worker_manager: Arc::new(TMutex::new(manager)),
     };
 
     println!("[Server] Listening on rustbase://{}", addr);
