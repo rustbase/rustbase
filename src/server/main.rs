@@ -1,5 +1,6 @@
 use crate::config::schema;
 use crate::query;
+use crate::server::auth::check_auth;
 use crate::server::engine::worker_manager::WorkerManager;
 use crate::server::route;
 use dustdata::{DustData, DustDataConfig, LsmConfig, Size};
@@ -59,14 +60,16 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
 
     let manager = WorkerManager::new(routers, cache, config.clone(), config.database.threads).await;
 
-    let database_server = Database {
+    let database = Database {
         worker_manager: Arc::new(TMutex::new(manager)),
     };
+
+    let svc = RustbaseServer::with_interceptor(database, check_auth);
 
     println!("[Server] Listening on rustbase://{}", addr);
 
     Server::builder()
-        .add_service(RustbaseServer::new(database_server))
+        .add_service(svc)
         .serve(addr)
         .await
         .unwrap();

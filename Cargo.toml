@@ -22,7 +22,7 @@ num_cpus = "1.13.1"
 pest = "2.4.0"
 pest_derive = "2.4.0"
 rand = "0.8.5"
-
+base64 = "0.13.1"
 
 [build-dependencies]
 winres = "0.1"

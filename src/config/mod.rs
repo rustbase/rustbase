@@ -19,6 +19,7 @@ pub fn default_configuration() -> schema::RustbaseConfig {
             threads: num_cpus::get(),
             cache_size: spec::DEFAULT_CACHE_SIZE,
         },
+        auth: None,
     }
 }
 
@@ -30,6 +31,11 @@ pub fn load_configuration() -> schema::RustbaseConfig {
     } else {
         get_current_path().join(spec::DEFAULT_CONFIG_NAME)
     };
+
+    if let Some(auth) = config.clone().auth {
+        std::env::set_var("RUSTBASE_INIT_USER", auth.username);
+        std::env::set_var("RUSTBASE_INIT_PASS", auth.password);
+    }
 
     if !config_path.exists() {
         println!(
@@ -93,4 +99,14 @@ pub fn load_configuration() -> schema::RustbaseConfig {
     println!("[Config] load config: {}", config);
 
     config
+}
+
+pub fn get_auth_config() -> Option<schema::Auth> {
+    if let Ok(username) = var("RUSTBASE_INIT_USER") {
+        if let Ok(password) = var("RUSTBASE_INIT_PASS") {
+            return Some(schema::Auth { username, password });
+        }
+    }
+
+    None
 }

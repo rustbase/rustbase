@@ -6,6 +6,7 @@ use std::fmt::Display;
 pub struct RustbaseConfig {
     pub net: Net,
     pub database: Database,
+    pub auth: Option<Auth>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -19,6 +20,12 @@ pub struct Database {
     pub path: String,
     pub cache_size: usize,
     pub threads: usize,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Auth {
+    pub username: String,
+    pub password: String,
 }
 
 fn parse_size_to_string(size: usize) -> String {
@@ -54,6 +61,9 @@ impl Display for RustbaseConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         writeln!(f, "{}", self.net)?;
         writeln!(f, "{}", self.database)?;
+        if let Some(auth) = &self.auth {
+            writeln!(f, "{}", auth)?;
+        }
         Ok(())
     }
 }
@@ -63,6 +73,18 @@ impl Display for Net {
         writeln!(f, "\nNetwork configuration: ")?;
         writeln!(f, "{}port: {}", IDENT, self.port.cyan())?;
         writeln!(f, "{}host: {}", IDENT, self.host.cyan())?;
+        Ok(())
+    }
+}
+
+impl Display for Auth {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "\nAuthentication configuration: ")?;
+        writeln!(f, "{}username: {}", IDENT, self.username.cyan())?;
+        let mut password = self.password.clone();
+        password.replace_range(0..password.len(), "*".repeat(password.len()).as_str());
+
+        writeln!(f, "{}password: {}", IDENT, password.cyan())?;
         Ok(())
     }
 }
