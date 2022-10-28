@@ -5,10 +5,8 @@ use super::super::{
         rustbase::{QueryResult, QueryResultType},
     },
 };
-use crate::{
-    config::schema,
-    query::{self, parser::Query},
-};
+use crate::{config::schema, query::parser::Query};
+use bson::Bson;
 use dustdata::DustData;
 use std::{collections::BTreeMap, sync::Arc};
 use std::{path::Path, sync::Mutex};
@@ -103,7 +101,7 @@ pub struct Worker {
 
 impl Worker {
     pub fn insert(
-        query: query::parser::InsertQuery,
+        query: (String, Bson),
         database: String,
         routers: TRouters,
         config: schema::RustbaseConfig,
@@ -126,7 +124,7 @@ impl Worker {
 
         let dd = routers.get_mut(&database).unwrap();
 
-        if dd.contains(&query.key) {
+        if dd.contains(&query.0) {
             drop(routers);
             return QueryResult {
                 error_message: Some(dd_error_code_to_string(dustdata::ErrorCode::KeyExists)),
@@ -136,7 +134,7 @@ impl Worker {
             };
         }
 
-        let insert = dd.insert(&query.key, query.value);
+        let insert = dd.insert(&query.0, query.1);
 
         if insert.is_err() {
             return QueryResult {
@@ -155,15 +153,10 @@ impl Worker {
         }
     }
 
-    pub fn get(
-        query: query::parser::GetQuery,
-        database: String,
-        cache: TCache,
-        routers: TRouters,
-    ) -> QueryResult {
+    pub fn get(query: String, database: String, cache: TCache, routers: TRouters) -> QueryResult {
         let mut cache = cache.lock().unwrap();
 
-        let cache_key = format!("{}:{}", database, query.key);
+        let cache_key = format!("{}:{}", database, query);
 
         if cache.contains(cache_key.clone()) {
             let v = cache.get(&cache_key).unwrap().clone();
@@ -189,7 +182,7 @@ impl Worker {
 
         let dd = routers.get_mut(&database).unwrap();
 
-        let value = dd.get(&query.key).unwrap();
+        let value = dd.get(&query).unwrap();
 
         if let Some(value) = value {
             cache.insert(cache_key, value.clone()).unwrap();
@@ -211,15 +204,15 @@ impl Worker {
     }
 
     pub fn update(
-        query: query::parser::UpdateQuery,
+        query: (String, Bson),
         database: String,
         cache: TCache,
         routers: TRouters,
     ) -> QueryResult {
         let mut cache = cache.lock().unwrap();
 
-        if cache.contains(query.key.clone()) {
-            cache.remove(&query.key).unwrap();
+        if cache.contains(query.0.clone()) {
+            cache.remove(&query.0).unwrap();
         }
 
         let mut routers = routers.lock().unwrap();
@@ -227,7 +220,7 @@ impl Worker {
         if routers.contains_key(&database) {
             let dd = routers.get_mut(&database).unwrap();
 
-            if !dd.contains(&query.key) {
+            if !dd.contains(&query.0) {
                 return QueryResult {
                     error_message: Some(dd_error_code_to_string(dustdata::ErrorCode::KeyNotExists)),
                     result_type: QueryResultType::NotFound as i32,
@@ -236,7 +229,7 @@ impl Worker {
                 };
             }
 
-            let update = dd.update(&query.key, query.value.clone());
+            let update = dd.update(&query.0, query.1.clone());
 
             if update.is_err() {
                 return QueryResult {
@@ -247,7 +240,7 @@ impl Worker {
                 };
             }
 
-            cache.insert(query.key, query.value).unwrap();
+            cache.insert(query.0, query.1).unwrap();
 
             QueryResult {
                 error_message: None,
@@ -266,7 +259,7 @@ impl Worker {
     }
 
     pub fn delete(
-        query: query::parser::DeleteQuery,
+        query: String,
         database: String,
         cache: TCache,
         routers: TRouters,
@@ -276,7 +269,7 @@ impl Worker {
         if routers.contains_key(&database) {
             let dd = routers.get_mut(&database).unwrap();
 
-            if !dd.contains(&query.key) {
+            if !dd.contains(&query) {
                 return QueryResult {
                     error_message: Some(dd_error_code_to_string(dustdata::ErrorCode::KeyNotExists)),
                     result_type: QueryResultType::NotFound as i32,
@@ -285,7 +278,7 @@ impl Worker {
                 };
             }
 
-            let delete = dd.delete(&query.key);
+            let delete = dd.delete(&query);
 
             if delete.is_err() {
                 return QueryResult {
@@ -297,7 +290,7 @@ impl Worker {
             }
 
             let mut cache = cache.lock().unwrap();
-            let cache_key = format!("{}:{}", database, query.key);
+            let cache_key = format!("{}:{}", database, query);
 
             if cache.contains(cache_key.clone()) {
                 cache.remove(&cache_key).unwrap();
@@ -355,10 +348,16 @@ impl Worker {
     ) -> QueryResult {
         match query {
             Query::Delete(query) => Worker::delete(query, database, cache, routers),
-            Query::Insert(query) => Worker::insert(query, database, routers, config),
+            Query::Insert(key, value) => Worker::insert((key, value), database, routers, config),
             Query::Get(query) => Worker::get(query, database, cache, routers),
-            Query::Update(query) => Worker::update(query, database, cache, routers),
-            Query::List => Worker::list(database, routers),
+            Query::Update(key, value) => Worker::update((key, value), database, cache, routers),
+            Query::List(opt_database) => {
+                if let Some(database) = opt_database {
+                    Worker::list(database, routers)
+                } else {
+                    Worker::list(database, routers)
+                }
+            }
             Query::None => QueryResult {
                 message: None,
                 error_message: Some("query.notProvided".to_string()),

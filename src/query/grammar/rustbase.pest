@@ -39,6 +39,6 @@ insert = { SOI ~ d_insert ~ json ~ "in" ~ inner ~ EOI}
 update = { SOI ~ d_update ~ json ~ "in" ~ inner ~ EOI}
 delete = { SOI ~ d_delete ~ inner ~ EOI}
 get = { SOI ~ d_get ~ inner ~ EOI}
-list = { SOI ~ d_list ~ EOI}
+list = { SOI ~ (d_list ~ EOI) | (d_list ~ inner ~ EOI)}
 
 crud = _{insert | get | update | delete | list}

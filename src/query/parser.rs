@@ -5,34 +5,12 @@ use pest::Parser;
 
 #[derive(Debug, Clone)]
 pub enum Query {
-    Get(GetQuery),
-    Insert(InsertQuery),
-    Update(UpdateQuery),
-    Delete(DeleteQuery),
-    List,
+    Get(String /* key */),
+    Insert(String /* key */, Bson /* value */),
+    Update(String /* key */, Bson /* value */),
+    Delete(String /* key */),
+    List(Option<String> /* database */),
     None,
-}
-
-#[derive(Debug, Clone)]
-pub struct GetQuery {
-    pub key: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct InsertQuery {
-    pub key: String,
-    pub value: Bson,
-}
-
-#[derive(Debug, Clone)]
-pub struct UpdateQuery {
-    pub key: String,
-    pub value: Bson,
-}
-
-#[derive(Debug, Clone)]
-pub struct DeleteQuery {
-    pub key: String,
 }
 
 #[derive(pest_derive::Parser)]
@@ -96,27 +74,36 @@ pub fn parse(input: String) -> Result<Query> {
                 let mut inner_rules = pair.into_inner();
                 let value = parse_to_bson(inner_rules.next().unwrap());
                 let key = inner_rules.next().unwrap().as_str().to_string();
-                return Ok(Query::Insert(InsertQuery { key, value }));
+                return Ok(Query::Insert(key, value));
             }
 
             Rule::get => {
                 let key = pair.into_inner().next().unwrap().as_str().to_string();
-                return Ok(Query::Get(GetQuery { key }));
+                return Ok(Query::Get(key));
             }
 
             Rule::update => {
                 let mut inner_rules = pair.into_inner();
                 let key = inner_rules.next().unwrap().as_str().to_string();
                 let value = parse_to_bson(inner_rules.next().unwrap());
-                return Ok(Query::Update(UpdateQuery { key, value }));
+                return Ok(Query::Update(key, value));
             }
 
             Rule::delete => {
                 let key = pair.into_inner().next().unwrap().as_str().to_string();
-                return Ok(Query::Delete(DeleteQuery { key }));
+                return Ok(Query::Delete(key));
             }
 
-            Rule::list => return Ok(Query::List),
+            Rule::list => {
+                let database = pair.into_inner().next().unwrap();
+
+                if database.as_rule() == Rule::inner {
+                    let database = database.as_str().to_string();
+                    return Ok(Query::List(Some(database)));
+                } else {
+                    return Ok(Query::List(None));
+                }
+            }
 
             _ => {
                 unreachable!()
