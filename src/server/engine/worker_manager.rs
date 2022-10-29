@@ -120,6 +120,7 @@ impl Worker {
             );
 
             routers.insert(database.clone(), dd);
+            println!("[Engine] created database {}", database);
         }
 
         let dd = routers.get_mut(&database).unwrap();
