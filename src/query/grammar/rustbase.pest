@@ -34,10 +34,11 @@ d_insert = _{ "insert" }
 d_update = _{ "update" | "upd" }
 d_delete = _{ "delete" | "del" }
 d_list = _{ "list" | "ls" }
+d_database = { "database" | "db" }
 
 insert = { SOI ~ d_insert ~ json ~ "in" ~ inner ~ EOI}
 update = { SOI ~ d_update ~ json ~ "in" ~ inner ~ EOI}
-delete = { SOI ~ d_delete ~ inner ~ EOI}
+delete = { SOI ~  (d_delete ~ d_database ~ inner ~ EOI) | (d_delete ~ inner ~ EOI) }
 get = { SOI ~ d_get ~ inner ~ EOI}
 list = { SOI ~ (d_list ~ EOI) | (d_list ~ inner ~ EOI)}
 

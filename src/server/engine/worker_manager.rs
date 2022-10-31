@@ -5,7 +5,7 @@ use super::super::{
         rustbase::{QueryResult, QueryResultType},
     },
 };
-use crate::{config::schema, query::parser::Query};
+use crate::{config::schema, query::parser::Query, server::route};
 use bson::Bson;
 use dustdata::DustData;
 use std::{collections::BTreeMap, sync::Arc};
@@ -260,48 +260,69 @@ impl Worker {
     }
 
     pub fn delete(
-        query: String,
+        query: (String, bool),
         database: String,
+        config: schema::RustbaseConfig,
         cache: TCache,
         routers: TRouters,
     ) -> QueryResult {
         let mut routers = routers.lock().unwrap();
 
         if routers.contains_key(&database) {
-            let dd = routers.get_mut(&database).unwrap();
+            if !query.1 {
+                let dd = routers.get_mut(&database).unwrap();
 
-            if !dd.contains(&query) {
-                return QueryResult {
-                    error_message: Some(dd_error_code_to_string(dustdata::ErrorCode::KeyNotExists)),
-                    result_type: QueryResultType::NotFound as i32,
+                if !dd.contains(&query.0) {
+                    return QueryResult {
+                        error_message: Some(dd_error_code_to_string(
+                            dustdata::ErrorCode::KeyNotExists,
+                        )),
+                        result_type: QueryResultType::NotFound as i32,
+                        bson: None,
+                        message: None,
+                    };
+                }
+
+                let delete = dd.delete(&query.0);
+
+                if delete.is_err() {
+                    return QueryResult {
+                        error_message: Some(dd_error_code_to_string(delete.err().unwrap().code)),
+                        result_type: QueryResultType::Error as i32,
+                        bson: None,
+                        message: None,
+                    };
+                }
+
+                let mut cache = cache.lock().unwrap();
+                let cache_key = format!("{}:{}", database, query.0);
+
+                if cache.contains(cache_key.clone()) {
+                    cache.remove(&cache_key).unwrap();
+                }
+
+                QueryResult {
+                    error_message: None,
+                    result_type: QueryResultType::Ok as i32,
                     bson: None,
                     message: None,
-                };
-            }
+                }
+            } else {
+                let mut dd = routers.remove(&query.0).unwrap();
+                dd.lsm.drop();
 
-            let delete = dd.delete(&query);
+                drop(dd);
 
-            if delete.is_err() {
-                return QueryResult {
-                    error_message: Some(dd_error_code_to_string(delete.err().unwrap().code)),
-                    result_type: QueryResultType::Error as i32,
+                route::remove_dustdata(config.database.path, query.0.clone());
+
+                println!("[Engine] database {} deleted", query.0);
+
+                QueryResult {
+                    error_message: None,
+                    result_type: QueryResultType::Ok as i32,
                     bson: None,
                     message: None,
-                };
-            }
-
-            let mut cache = cache.lock().unwrap();
-            let cache_key = format!("{}:{}", database, query);
-
-            if cache.contains(cache_key.clone()) {
-                cache.remove(&cache_key).unwrap();
-            }
-
-            QueryResult {
-                error_message: None,
-                result_type: QueryResultType::Ok as i32,
-                bson: None,
-                message: None,
+                }
             }
         } else {
             QueryResult {
@@ -348,7 +369,9 @@ impl Worker {
         config: schema::RustbaseConfig,
     ) -> QueryResult {
         match query {
-            Query::Delete(query) => Worker::delete(query, database, cache, routers),
+            Query::Delete(query, is_database) => {
+                Worker::delete((query, is_database), database, config, cache, routers)
+            }
             Query::Insert(key, value) => Worker::insert((key, value), database, routers, config),
             Query::Get(query) => Worker::get(query, database, cache, routers),
             Query::Update(key, value) => Worker::update((key, value), database, cache, routers),

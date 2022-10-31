@@ -8,7 +8,10 @@ pub enum Query {
     Get(String /* key */),
     Insert(String /* key */, Bson /* value */),
     Update(String /* key */, Bson /* value */),
-    Delete(String /* key */),
+    Delete(
+        String, /* key */
+        bool,   /* is to delete a database */
+    ),
     List(Option<String> /* database */),
     None,
 }
@@ -90,8 +93,18 @@ pub fn parse(input: String) -> Result<Query> {
             }
 
             Rule::delete => {
-                let key = pair.into_inner().next().unwrap().as_str().to_string();
-                return Ok(Query::Delete(key));
+                let mut inner_rules = pair.into_inner();
+
+                let key = inner_rules.next().unwrap();
+
+                if key.as_rule() == Rule::d_database {
+                    let database = inner_rules.next().unwrap().as_str().to_string();
+
+                    return Ok(Query::Delete(database, true));
+                } else {
+                    let key = key.as_str().to_string();
+                    return Ok(Query::Delete(key, false));
+                }
             }
 
             Rule::list => {
