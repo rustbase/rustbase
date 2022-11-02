@@ -123,7 +123,7 @@ where
                 socket.write_all(&response).await.unwrap();
             }
             Err(e) => {
-                eprintln!("failed to read from socket; err = {:?}", e);
+                eprintln!("[Wirewave] failed to read from socket; err = {:?}", e);
             }
         };
     }
