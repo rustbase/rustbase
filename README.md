@@ -28,30 +28,8 @@ A noSQL key-value database cross-platform program written in [Rust](https://www.
 
 You can download the latest version of Rustbase [here](https://github.com/rustbase/rustbase/releases)
 
-# Development Dependencies
-
-Because of `tonic` dependency, we need some extra dependencies to compile the program.
-
-## Ubuntu
-
-```bash
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y protobuf-compiler libprotobuf-dev
-```
-
-## Alpine Linux
-
-```bash
-sudo apk add protoc protobuf-dev
-```
-
-## MacOS
-
-```bash
-brew install protobuf
-```
-
-[Reference](https://github.com/hyperium/tonic#dependencies)
+# Rustbase CLI
+Use the [Rustbase CLI](https://github.com/rustbase/rustbase-cli) to manage your Rustbase Server.
 
 # 🔗 Contribute
 
