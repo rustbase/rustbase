@@ -1,10 +1,4 @@
-use super::super::{
-    cache::Cache,
-    main::{
-        create_dustdata,
-        rustbase::{QueryResult, QueryResultType},
-    },
-};
+use super::super::{cache::Cache, main::create_dustdata, wirewave};
 use crate::{config::schema, query::parser::Query, server::route};
 use bson::Bson;
 use dustdata::DustData;
@@ -14,6 +8,7 @@ use tokio::{
     spawn,
     sync::{mpsc, watch, Mutex as TMutex, RwLock},
 };
+use wirewave::server::{Response, Status};
 
 pub struct WorkerManager {
     pub workers: Vec<(Worker, InSendOutRecv)>,
@@ -21,7 +16,7 @@ pub struct WorkerManager {
 
 type InSendOutRecv = (
     watch::Sender<(Query, String)>,
-    ArcTMutex<mpsc::Receiver<QueryResult>>,
+    ArcTMutex<mpsc::Receiver<Response>>,
 );
 type ArcMutex<T> = Arc<Mutex<T>>;
 type ArcTMutex<T> = Arc<TMutex<T>>;
@@ -55,7 +50,7 @@ impl WorkerManager {
         Self { workers }
     }
 
-    pub async fn process(&self, query: Query, database: String) -> QueryResult {
+    pub async fn process(&self, query: Query, database: String) -> Response {
         let iter = self.workers.iter();
 
         for (worker, (in_sender, out_receiver)) in iter {
@@ -75,11 +70,10 @@ impl WorkerManager {
         // we should fix this.
         // hackers can use a DDOS attack to crash the server :(
 
-        QueryResult {
-            result_type: QueryResultType::Error as i32,
-            error_message: Some("workers.notAvailable".to_string()),
-            bson: None,
-            message: None,
+        Response {
+            status: Status::Error,
+            message: Some("workers.notAvailable".to_string()),
+            body: None,
         }
     }
 }
@@ -95,7 +89,7 @@ pub type TRouters = Arc<Mutex<BTreeMap<String, DustData>>>;
 
 pub struct Worker {
     pub in_receiver: watch::Receiver<(Query, String)>,
-    pub out_sender: mpsc::Sender<QueryResult>,
+    pub out_sender: mpsc::Sender<Response>,
     pub is_available: Arc<RwLock<bool>>,
 }
 
@@ -105,7 +99,7 @@ impl Worker {
         database: String,
         routers: TRouters,
         config: schema::RustbaseConfig,
-    ) -> QueryResult {
+    ) -> Response {
         let mut routers = routers.lock().unwrap();
 
         let dd = routers.get_mut(&database);
@@ -127,10 +121,9 @@ impl Worker {
 
         if dd.contains(&query.0) {
             drop(routers);
-            return QueryResult {
-                error_message: Some(dd_error_code_to_string(dustdata::ErrorCode::KeyExists)),
-                result_type: QueryResultType::Error as i32,
-                bson: None,
+            return Response {
+                status: Status::KeyAlreadyExists,
+                body: None,
                 message: None,
             };
         }
@@ -138,23 +131,21 @@ impl Worker {
         let insert = dd.insert(&query.0, query.1);
 
         if insert.is_err() {
-            return QueryResult {
-                result_type: QueryResultType::Error as i32,
-                error_message: Some(dd_error_code_to_string(insert.err().unwrap().code)),
-                bson: None,
-                message: None,
+            return Response {
+                status: Status::Error,
+                message: Some(dd_error_code_to_string(insert.err().unwrap().code)),
+                body: None,
             };
         }
 
-        QueryResult {
-            error_message: None,
-            result_type: QueryResultType::Ok as i32,
-            bson: None,
+        Response {
+            status: Status::Ok,
+            body: None,
             message: None,
         }
     }
 
-    pub fn get(query: String, database: String, cache: TCache, routers: TRouters) -> QueryResult {
+    pub fn get(query: String, database: String, cache: TCache, routers: TRouters) -> Response {
         let mut cache = cache.lock().unwrap();
 
         let cache_key = format!("{}:{}", database, query);
@@ -162,10 +153,9 @@ impl Worker {
         if cache.contains(cache_key.clone()) {
             let v = cache.get(&cache_key).unwrap().clone();
 
-            return QueryResult {
-                error_message: None,
-                result_type: QueryResultType::Ok as i32,
-                bson: Some(bson::to_vec(&v).unwrap()),
+            return Response {
+                status: Status::Ok,
+                body: Some(v),
                 message: None,
             };
         }
@@ -173,10 +163,9 @@ impl Worker {
         let mut routers = routers.lock().unwrap();
 
         if !routers.contains_key(&database) {
-            return QueryResult {
-                error_message: Some("database.notFound".to_string()),
-                result_type: QueryResultType::NotFound as i32,
-                bson: None,
+            return Response {
+                status: Status::DatabaseNotFound,
+                body: None,
                 message: None,
             };
         }
@@ -188,17 +177,15 @@ impl Worker {
         if let Some(value) = value {
             cache.insert(cache_key, value.clone()).unwrap();
 
-            QueryResult {
-                error_message: None,
-                result_type: QueryResultType::Ok as i32,
-                bson: Some(bson::to_vec(&value).unwrap()),
+            Response {
+                status: Status::Ok,
+                body: Some(value),
                 message: None,
             }
         } else {
-            QueryResult {
-                result_type: QueryResultType::NotFound as i32,
-                error_message: Some(dd_error_code_to_string(dustdata::ErrorCode::KeyNotExists)),
-                bson: None,
+            Response {
+                status: Status::KeyNotExists,
+                body: None,
                 message: None,
             }
         }
@@ -209,7 +196,7 @@ impl Worker {
         database: String,
         cache: TCache,
         routers: TRouters,
-    ) -> QueryResult {
+    ) -> Response {
         let mut cache = cache.lock().unwrap();
 
         if cache.contains(query.0.clone()) {
@@ -222,10 +209,9 @@ impl Worker {
             let dd = routers.get_mut(&database).unwrap();
 
             if !dd.contains(&query.0) {
-                return QueryResult {
-                    error_message: Some(dd_error_code_to_string(dustdata::ErrorCode::KeyNotExists)),
-                    result_type: QueryResultType::NotFound as i32,
-                    bson: None,
+                return Response {
+                    status: Status::KeyNotExists,
+                    body: None,
                     message: None,
                 };
             }
@@ -233,27 +219,24 @@ impl Worker {
             let update = dd.update(&query.0, query.1.clone());
 
             if update.is_err() {
-                return QueryResult {
-                    error_message: Some(dd_error_code_to_string(update.err().unwrap().code)),
-                    result_type: QueryResultType::Error as i32,
-                    bson: None,
-                    message: None,
+                return Response {
+                    message: Some(dd_error_code_to_string(update.err().unwrap().code)),
+                    status: Status::Error,
+                    body: None,
                 };
             }
 
             cache.insert(query.0, query.1).unwrap();
 
-            QueryResult {
-                error_message: None,
-                result_type: QueryResultType::Ok as i32,
-                bson: None,
+            Response {
+                status: Status::Ok,
+                body: None,
                 message: None,
             }
         } else {
-            QueryResult {
-                error_message: Some("database.notFound".to_string()),
-                result_type: QueryResultType::NotFound as i32,
-                bson: None,
+            Response {
+                status: Status::DatabaseNotFound,
+                body: None,
                 message: None,
             }
         }
@@ -265,7 +248,7 @@ impl Worker {
         config: schema::RustbaseConfig,
         cache: TCache,
         routers: TRouters,
-    ) -> QueryResult {
+    ) -> Response {
         let mut routers = routers.lock().unwrap();
 
         if routers.contains_key(&database) {
@@ -273,12 +256,9 @@ impl Worker {
                 let dd = routers.get_mut(&database).unwrap();
 
                 if !dd.contains(&query.0) {
-                    return QueryResult {
-                        error_message: Some(dd_error_code_to_string(
-                            dustdata::ErrorCode::KeyNotExists,
-                        )),
-                        result_type: QueryResultType::NotFound as i32,
-                        bson: None,
+                    return Response {
+                        status: Status::KeyNotExists,
+                        body: None,
                         message: None,
                     };
                 }
@@ -286,11 +266,10 @@ impl Worker {
                 let delete = dd.delete(&query.0);
 
                 if delete.is_err() {
-                    return QueryResult {
-                        error_message: Some(dd_error_code_to_string(delete.err().unwrap().code)),
-                        result_type: QueryResultType::Error as i32,
-                        bson: None,
-                        message: None,
+                    return Response {
+                        message: Some(dd_error_code_to_string(delete.err().unwrap().code)),
+                        status: Status::Error,
+                        body: None,
                     };
                 }
 
@@ -301,10 +280,9 @@ impl Worker {
                     cache.remove(&cache_key).unwrap();
                 }
 
-                QueryResult {
-                    error_message: None,
-                    result_type: QueryResultType::Ok as i32,
-                    bson: None,
+                Response {
+                    status: Status::Ok,
+                    body: None,
                     message: None,
                 }
             } else {
@@ -317,45 +295,37 @@ impl Worker {
 
                 println!("[Engine] database {} deleted", query.0);
 
-                QueryResult {
-                    error_message: None,
-                    result_type: QueryResultType::Ok as i32,
-                    bson: None,
+                Response {
+                    status: Status::Ok,
+                    body: None,
                     message: None,
                 }
             }
         } else {
-            QueryResult {
-                error_message: Some("database.notFound".to_string()),
-                result_type: QueryResultType::NotFound as i32,
-                bson: None,
+            Response {
+                status: Status::DatabaseNotFound,
+                body: None,
                 message: None,
             }
         }
     }
 
-    pub fn list(database: String, routers: TRouters) -> QueryResult {
+    pub fn list(database: String, routers: TRouters) -> Response {
         let mut routers = routers.lock().unwrap();
 
         if routers.contains_key(&database) {
             let dd = routers.get_mut(&database).unwrap();
             let list = dd.list_keys().unwrap();
 
-            let doc = bson::doc! {
-                "_l": list
-            };
-
-            QueryResult {
-                error_message: None,
-                result_type: QueryResultType::Ok as i32,
-                bson: Some(bson::to_vec(&doc).unwrap()),
+            Response {
+                status: Status::Ok,
+                body: Some(list.into()),
                 message: None,
             }
         } else {
-            QueryResult {
-                error_message: Some("database.notFound".to_string()),
-                result_type: QueryResultType::NotFound as i32,
-                bson: None,
+            Response {
+                status: Status::DatabaseNotFound,
+                body: None,
                 message: None,
             }
         }
@@ -367,7 +337,7 @@ impl Worker {
         cache: TCache,
         routers: TRouters,
         config: schema::RustbaseConfig,
-    ) -> QueryResult {
+    ) -> Response {
         match query {
             Query::Delete(query, is_database) => {
                 Worker::delete((query, is_database), database, config, cache, routers)
@@ -382,11 +352,10 @@ impl Worker {
                     Worker::list(database, routers)
                 }
             }
-            Query::None => QueryResult {
+            Query::None => Response {
                 message: None,
-                error_message: Some("query.notProvided".to_string()),
-                result_type: QueryResultType::SyntaxError as i32,
-                bson: None,
+                status: Status::InvalidQuery,
+                body: None,
             },
         }
     }
@@ -395,7 +364,7 @@ impl Worker {
 impl Worker {
     pub fn new(
         in_receiver: watch::Receiver<(Query, String)>,
-        out_sender: mpsc::Sender<QueryResult>,
+        out_sender: mpsc::Sender<Response>,
     ) -> Self {
         Self {
             in_receiver,

@@ -14,19 +14,17 @@ chrono = { version = "0.4.19", features = ["serde"] }
 hex = "0.4.3"
 bson = "2.4.0"
 dustdata = "0.4.5"
-tonic = "0.8.0"
-prost = "0.11.0"
 colored = "2.0.0"
 path-absolutize = "3.0.13"
 num_cpus = "1.13.1"
 pest = "2.4.0"
 pest_derive = "2.4.0"
 rand = "0.8.5"
+async-trait = "0.1.58"
 base64 = "0.13.1"
 
 [build-dependencies]
 winres = "0.1"
-tonic-build = "0.8.2"
 
 [package.metadata.winres]
 OriginalFilename = "rustbase.exe"

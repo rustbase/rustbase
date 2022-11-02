@@ -3,6 +3,7 @@ pub mod cache;
 pub mod engine;
 pub mod main;
 pub mod route;
+pub mod wirewave;
 
 use crate::config::schema;
 
