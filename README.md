@@ -45,6 +45,7 @@ Join our [Discord server](https://discord.gg/m5ZzWPumbd) to get help and discuss
     -   [Cache](./src/server/cache/)
     -   [Engine](./src/server/engine/)
     -   [Route](./src/server/route/)
+    -   [Wirewave](./src/server/wirewave/)
 -   [Utils](./src/utils/)
 
 # Authors

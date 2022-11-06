@@ -8,7 +8,7 @@ Each request is a BSON document with the following fields:
 ## Response
 Each response is a BSON document with the following fields:
 - `body`: The body of the message. This is a BSON document.
-- `message`: The message to send to the client. This is a BSON document.
+- `message`: The message to send to the client. This is a string.
 - `status`: The status of the response. This is a enum with the following values:
   - `Ok`: The request was successful.
   - `Error`: The request failed.

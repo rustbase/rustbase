@@ -66,7 +66,7 @@ impl<T: Wirewave> Clone for _Inner<T> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Request {
     pub body: bson::Bson,
 }
@@ -95,19 +95,14 @@ where
     F: Fn(Request) -> Fut,
     Fut: Future<Output = Result<Response, Status>>,
 {
-    let mut buf = [0; 1024];
+    let mut buf = [0; 2048];
 
     loop {
         match socket.read(&mut buf).await {
-            Ok(n) if n == 0 => return,
             Ok(n) => {
-                let doc: bson::Document = bson::from_slice(&buf[0..n]).unwrap();
+                let request: Request = bson::from_slice(&buf[..n]).unwrap();
 
-                let body = doc.get("body").unwrap().clone();
-
-                let request = Request { body };
-
-                let response = match callback(request).await {
+                let response = match callback(request.clone()).await {
                     Ok(response) => response,
                     Err(status) => Response {
                         message: None,
@@ -117,7 +112,6 @@ where
                 };
 
                 let response = bson::to_bson(&response).unwrap();
-
                 let response = bson::to_vec(&response).unwrap();
 
                 socket.write_all(&response).await.unwrap();
