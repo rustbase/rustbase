@@ -52,7 +52,7 @@ Join our [Discord server](https://discord.gg/m5ZzWPumbd) to get help and discuss
 
 <div align="center">
 
-| [<img src="https://github.com/pedrinfx.png?size=115" width=115><br><sub>@pedrinfx</sub>](https://github.com/pedrinfx) |
+| [<img src="https://github.com/peeeuzin.png?size=115" width=115><br><sub>@peeeuzin</sub>](https://github.com/peeeuzin) |
 | :-------------------------------------------------------------------------------------------------------------------: |
 
 </div>
