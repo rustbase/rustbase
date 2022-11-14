@@ -7,7 +7,7 @@ Wirewave uses BSON to encode messages. BSON is a binary format that is similar t
 
 ## Requests
 Each request must be a BSON document with the following fields:
-
+-   `auth` - A basic authentication string. This is used to authenticate the client. (This can be empty if the server is not configured to require authentication.)
 -   `body` - The body of the message. This is a BSON document.
 
 ## Response
