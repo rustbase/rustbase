@@ -15,11 +15,17 @@ pub fn default_configuration() -> schema::RustbaseConfig {
             port: "23561".to_string(),
         },
         database: schema::Database {
-            path: "./data".to_string(),
+            path: get_current_path()
+                .join("./data")
+                .absolutize()
+                .unwrap()
+                .display()
+                .to_string(),
             threads: num_cpus::get(),
             cache_size: spec::DEFAULT_CACHE_SIZE,
         },
         auth: None,
+        tls: None,
     }
 }
 
@@ -31,11 +37,6 @@ pub fn load_configuration() -> schema::RustbaseConfig {
     } else {
         get_current_path().join(spec::DEFAULT_CONFIG_NAME)
     };
-
-    if let Some(auth) = config.clone().auth {
-        std::env::set_var("RUSTBASE_INIT_USER", auth.username);
-        std::env::set_var("RUSTBASE_INIT_PASS", auth.password);
-    }
 
     if !config_path.exists() {
         println!(
@@ -59,6 +60,8 @@ pub fn load_configuration() -> schema::RustbaseConfig {
             panic!("{} not found", config_path.absolutize().unwrap().display());
         }
 
+        println!("[Config] load config: {}", config);
+
         return config;
     }
 
@@ -72,6 +75,8 @@ pub fn load_configuration() -> schema::RustbaseConfig {
                 println!("[Config] Check the config file for errors.");
                 println!("[Config] Using default configuration");
 
+                println!("[Config] load config: {}", config);
+
                 return config;
             } else {
                 println!(
@@ -83,6 +88,11 @@ pub fn load_configuration() -> schema::RustbaseConfig {
             }
         }
     };
+
+    if let Some(auth) = config.clone().auth {
+        std::env::set_var("RUSTBASE_INIT_USER", auth.username);
+        std::env::set_var("RUSTBASE_INIT_PASS", auth.password);
+    }
 
     config.database.path = get_current_path()
         .join(&config.database.path)

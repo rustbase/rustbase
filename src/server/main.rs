@@ -74,7 +74,11 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
 
     println!("[Server] Listening on rustbase://{}", addr);
 
-    Server::new(svc).serve(addr).await.unwrap();
+    if let Some(tls) = config.tls {
+        Server::new(svc).serve_tls(addr, tls).await;
+    } else {
+        Server::new(svc).serve(addr).await;
+    }
 }
 
 pub fn default_dustdata_config(data_path: String) -> DustDataConfig {
