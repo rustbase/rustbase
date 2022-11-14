@@ -18,11 +18,12 @@ A noSQL key-value database cross-platform program written in [Rust](https://www.
 
 # Supported platforms
 
-| **Platform** | **is supported?** |
-| ------------ | ----------------- |
-| Windows      | Yes               |
-| Linux        | Yes               |
-| macOS        | No                |
+|         | Windows | Linux | MacOS |
+| ------- | ------- | ----- | ----- |
+| i686    | ✅       | ✅     | -     |
+| x64     | ✅       | ✅     | -     |
+| aarch64 | -       | -     | -     |
+| arm     | -       | -     | -     |
 
 # Download
 
