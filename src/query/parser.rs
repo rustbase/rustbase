@@ -59,7 +59,10 @@ pub fn parse_to_bson(pair: Pair<Rule>) -> Bson {
         Rule::number => Bson::Int64(pair.as_str().parse().unwrap()),
         Rule::boolean => Bson::Boolean(pair.as_str().parse().unwrap()),
         Rule::null => Bson::Null,
-        _ => unreachable!(),
+        _ => {
+            println!("{:?}", pair);
+            unreachable!();
+        }
     }
 }
 
@@ -87,8 +90,8 @@ pub fn parse(input: String) -> Result<Query> {
 
             Rule::update => {
                 let mut inner_rules = pair.into_inner();
-                let key = inner_rules.next().unwrap().as_str().to_string();
                 let value = parse_to_bson(inner_rules.next().unwrap());
+                let key = inner_rules.next().unwrap().as_str().to_string();
                 return Ok(Query::Update(key, value));
             }
 
