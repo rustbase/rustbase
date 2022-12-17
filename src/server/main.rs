@@ -4,6 +4,7 @@ use crate::query;
 use crate::server::engine::worker_manager::WorkerManager;
 use crate::server::route;
 use async_trait::async_trait;
+use colored::Colorize;
 use dustdata::{DustData, DustDataConfig, LsmConfig, Size};
 use std::sync::{Arc, Mutex};
 use tokio::sync::Mutex as TMutex;
@@ -72,7 +73,10 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
 
     let svc = WirewaveServer::new(database);
 
-    println!("[Server] Listening on rustbase://{}", addr);
+    println!(
+        "[Server] listening on {}",
+        format!("rustbase://{}", addr).yellow()
+    );
 
     if let Some(tls) = config.tls {
         Server::new(svc).serve_tls(addr, tls).await;
