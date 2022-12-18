@@ -65,6 +65,20 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
         config.database.cache_size,
     )));
 
+    let c_routers = routers.clone();
+    ctrlc::set_handler(move || {
+        c_routers
+            .lock()
+            .unwrap()
+            .iter_mut()
+            .for_each(|(route, dd)| {
+                println!("[Server] flushing {} to exit", route.yellow());
+                dd.flush().unwrap();
+            });
+        std::process::exit(0);
+    })
+    .expect("Error setting Ctrl-C handler");
+
     let manager = WorkerManager::new(routers, cache, config.clone(), config.database.threads).await;
 
     let database = Database {
@@ -90,6 +104,7 @@ pub fn default_dustdata_config(data_path: String) -> DustDataConfig {
         path: data_path,
         verbose: true,
         lsm_config: LsmConfig {
+            detect_exit_signals: false,
             flush_threshold: Size::Megabytes(256),
         },
     }

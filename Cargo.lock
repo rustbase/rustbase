@@ -297,16 +297,18 @@ dependencies = [
 
 [[package]]
 name = "dustdata"
-version = "0.4.6"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40c1b4e09374148ed12fd894d33ce64aec69cd0aa81bd63b3f0bfd907970277c"
+checksum = "eea6dddca08e04632e0a994277ba9d982aae059f1048611f1c00d471716c17ce"
 dependencies = [
  "bitvec",
  "bson",
+ "chrono",
  "ctrlc",
  "farmhash",
  "hex",
  "lz4",
+ "serde",
 ]
 
 [[package]]
@@ -778,6 +780,7 @@ dependencies = [
  "bson",
  "chrono",
  "colored",
+ "ctrlc",
  "dustdata",
  "hex",
  "num_cpus",
