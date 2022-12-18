@@ -29,7 +29,7 @@ A noSQL key-value database cross-platform program written in [Rust](https://www.
 
 You can download the latest version of Rustbase [here](https://github.com/rustbase/rustbase/releases)
 
-# Components
+# External Components
 ## Rustbase CLI
 Use the [Rustbase CLI](https://github.com/rustbase/rustbase-cli) to manage your Rustbase Server.
 
@@ -42,7 +42,7 @@ Use the [Rustbase CLI](https://github.com/rustbase/rustbase-cli) to manage your 
 
 Join our [Discord server](https://discord.gg/m5ZzWPumbd) to get help and discuss features.
 
-# Components
+# Internal Components
 
 -   [Config](./src/config/)
 -   [Query](./src/query/)
