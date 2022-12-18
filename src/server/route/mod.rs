@@ -54,7 +54,7 @@ pub fn initialize_dustdata(path: String) -> Arc<Mutex<BTreeMap<String, DustData>
 }
 
 pub fn remove_dustdata(data_path: String, route: String) {
-    let path = path::Path::new(&data_path).join(&route);
+    let path = path::Path::new(&data_path).join(route);
 
     if path.exists() {
         fs::remove_dir_all(path).unwrap();
