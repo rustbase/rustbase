@@ -12,7 +12,7 @@ Rustbase
 
 <br />
 
-[![](https://img.shields.io/badge/Donate-Stripe-%23635afe)](https://donate.stripe.com/4gw8xx3wc1Uyb96288)
+[![](https://img.shields.io/badge/Donate-Stripe-%23635afe?style=for-the-badge)](https://donate.stripe.com/4gw8xx3wc1Uyb96288)
 
 </div>
 
