@@ -6,7 +6,9 @@
 Rustbase
 </h1>
 
-A noSQL key-value database cross-platform program written in [Rust](https://www.rust-lang.org/)
+### A noSQL key-value database cross-platform program written in [Rust](https://www.rust-lang.org/)
+
+##### Rustbase is open source, lightweight, modern and fast NoSQL database, using DustData as the storage engine.
 
 <br />
 
