@@ -40,10 +40,12 @@ You can install the latest version of Rustbase using the following command:
 curl -L https://www.rustbase.app/install | bash
 ```
 
+### Manual Installation
+You can download the latest version of Rustbase [here](https://github.com/rustbase/rustbase/releases).
+
+
 ## MacOS
 **Currently, Rustbase is not available for MacOS.**
-
-You can download the latest version of Rustbase [here](https://github.com/rustbase/rustbase/releases)
 
 # External Components
 ## Rustbase CLI
