@@ -286,14 +286,20 @@ impl Worker {
                     message: None,
                 }
             } else {
-                let mut dd = routers.remove(&query.0).unwrap();
+                let database = if query.0.is_empty() {
+                    database
+                } else {
+                    query.0
+                };
+
+                let mut dd = routers.remove(&database).unwrap();
                 dd.lsm.drop();
 
                 drop(dd);
 
-                route::remove_dustdata(config.database.path, query.0.clone());
+                route::remove_dustdata(config.database.path, database.clone());
 
-                println!("[Engine] database {} deleted", query.0);
+                println!("[Engine] database {} deleted", database);
 
                 Response {
                     status: Status::Ok,
