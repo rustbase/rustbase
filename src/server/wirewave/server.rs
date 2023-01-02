@@ -27,6 +27,8 @@ fn load_keys(path: &String) -> io::Result<Vec<PrivateKey>> {
         .map(|mut keys| keys.drain(..).map(PrivateKey).collect())
 }
 
+const BUFFER_SIZE: usize = 8 * 1024;
+
 #[async_trait]
 pub trait Wirewave: Send + Sync + 'static {
     async fn request(&self, request: Request) -> Result<Response, Status>;
@@ -184,10 +186,19 @@ where
     F: Fn(Request) -> Fut,
     Fut: Future<Output = Result<Response, Status>>,
 {
-    let mut buf = [0; 2048];
+    let mut buf = [0; BUFFER_SIZE];
 
     loop {
         match socket.read(&mut buf).await {
+            Err(e) => {
+                eprintln!("[Wirewave] failed to read from socket; {:?}", e);
+            }
+
+            Ok(0) => {
+                println!("[Wirewave] connection closed");
+                break;
+            }
+
             Ok(n) => match process_request(&buf[..n]) {
                 Ok(request) => {
                     let response = match callback(request).await {
@@ -210,9 +221,6 @@ where
                     socket.write_all(&response).await.unwrap();
                 }
             },
-            Err(e) => {
-                eprintln!("[Wirewave] failed to read from socket; {:?}", e);
-            }
         };
     }
 }
@@ -222,10 +230,19 @@ where
     F: Fn(Request) -> Fut,
     Fut: Future<Output = Result<Response, Status>>,
 {
-    let mut buf = [0; 2048];
+    let mut buf = [0; BUFFER_SIZE];
 
     loop {
         match socket.read(&mut buf).await {
+            Err(e) => {
+                eprintln!("[Wirewave] failed to read from socket; {:?}", e);
+            }
+
+            Ok(0) => {
+                println!("[Wirewave] connection closed");
+                break;
+            }
+
             Ok(n) => match process_request(&buf[..n]) {
                 Ok(request) => {
                     let response = match callback(request).await {
@@ -248,9 +265,6 @@ where
                     socket.write_all(&response).await.unwrap();
                 }
             },
-            Err(e) => {
-                eprintln!("[Wirewave] failed to read from socket; {:?}", e);
-            }
         };
     }
 }
