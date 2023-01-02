@@ -32,7 +32,7 @@ winres = "0.1"
 
 [package.metadata.winres]
 OriginalFilename = "rustbase.exe"
-LegalCopyright = "Rustbase © 2022, The Rustbase Project Developers"
+LegalCopyright = "Rustbase © 2023, The Rustbase Project Developers"
 ProductName = "Rustbase Database"
 ProductVersion = "0.3.0"
 FileDescription = "Rustbase Database Server"
