@@ -186,42 +186,44 @@ where
     F: Fn(Request) -> Fut,
     Fut: Future<Output = Result<Response, Status>>,
 {
-    let mut buf = [0; BUFFER_SIZE];
+    let mut buffer = vec![0; BUFFER_SIZE];
 
     loop {
-        match socket.read(&mut buf).await {
-            Err(e) => {
-                eprintln!("[Wirewave] failed to read from socket; {:?}", e);
-            }
+        let mut request_bytes = Vec::new();
 
-            Ok(0) => {
+        while let Ok(n) = socket.read(&mut buffer).await {
+            if n == 0 {
                 println!("[Wirewave] connection closed");
                 break;
             }
+            request_bytes.extend_from_slice(&buffer[..n]);
+            if n < BUFFER_SIZE {
+                break;
+            }
+        }
 
-            Ok(n) => match process_request(&buf[..n]) {
-                Ok(request) => {
-                    let response = match callback(request).await {
-                        Ok(response) => response,
-                        Err(status) => Response {
-                            message: None,
-                            status,
-                            body: None,
-                        },
-                    };
+        match process_request(&request_bytes[..]) {
+            Ok(request) => {
+                let response = match callback(request).await {
+                    Ok(response) => response,
+                    Err(status) => Response {
+                        message: None,
+                        status,
+                        body: None,
+                    },
+                };
 
-                    let response = bson::to_bson(&response).unwrap();
-                    let response = bson::to_vec(&response).unwrap();
+                let response = bson::to_bson(&response).unwrap();
+                let response = bson::to_vec(&response).unwrap();
 
-                    socket.write_all(&response).await.unwrap();
-                }
-                Err(response) => {
-                    let response = bson::to_vec(&response).unwrap();
+                socket.write_all(&response).await.unwrap();
+            }
+            Err(response) => {
+                let response = bson::to_vec(&response).unwrap();
 
-                    socket.write_all(&response).await.unwrap();
-                }
-            },
-        };
+                socket.write_all(&response).await.unwrap();
+            }
+        }
     }
 }
 
@@ -230,41 +232,43 @@ where
     F: Fn(Request) -> Fut,
     Fut: Future<Output = Result<Response, Status>>,
 {
-    let mut buf = [0; BUFFER_SIZE];
+    let mut buffer = vec![0; BUFFER_SIZE];
 
     loop {
-        match socket.read(&mut buf).await {
-            Err(e) => {
-                eprintln!("[Wirewave] failed to read from socket; {:?}", e);
-            }
+        let mut request_bytes = Vec::new();
 
-            Ok(0) => {
+        while let Ok(n) = socket.read(&mut buffer).await {
+            if n == 0 {
                 println!("[Wirewave] connection closed");
                 break;
             }
+            request_bytes.extend_from_slice(&buffer[..n]);
+            if n < BUFFER_SIZE {
+                break;
+            }
+        }
 
-            Ok(n) => match process_request(&buf[..n]) {
-                Ok(request) => {
-                    let response = match callback(request).await {
-                        Ok(response) => response,
-                        Err(status) => Response {
-                            message: None,
-                            status,
-                            body: None,
-                        },
-                    };
+        match process_request(&request_bytes[..]) {
+            Ok(request) => {
+                let response = match callback(request).await {
+                    Ok(response) => response,
+                    Err(status) => Response {
+                        message: None,
+                        status,
+                        body: None,
+                    },
+                };
 
-                    let response = bson::to_bson(&response).unwrap();
-                    let response = bson::to_vec(&response).unwrap();
+                let response = bson::to_bson(&response).unwrap();
+                let response = bson::to_vec(&response).unwrap();
 
-                    socket.write_all(&response).await.unwrap();
-                }
-                Err(response) => {
-                    let response = bson::to_vec(&response).unwrap();
+                socket.write_all(&response).await.unwrap();
+            }
+            Err(response) => {
+                let response = bson::to_vec(&response).unwrap();
 
-                    socket.write_all(&response).await.unwrap();
-                }
-            },
-        };
+                socket.write_all(&response).await.unwrap();
+            }
+        }
     }
 }
