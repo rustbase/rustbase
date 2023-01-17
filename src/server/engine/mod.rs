@@ -1,1 +1,1 @@
-pub mod worker_manager;
+pub mod core;

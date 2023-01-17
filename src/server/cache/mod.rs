@@ -76,10 +76,6 @@ impl Cache {
         Ok(())
     }
 
-    pub fn contains(&self, key: String) -> bool {
-        self.cache.contains_key(&key)
-    }
-
     fn is_cache_full(&self) -> bool {
         if self.cache_size >= self.max_size {
             println!("[Cache] The cache is full");
