@@ -26,6 +26,7 @@ tokio-rustls = "0.23.4"
 rustls-pemfile = "1.0.1"
 rustls = "0.20.7"
 ctrlc = { version = "3.2.4", features = ["termination"] }
+rayon = "1.6.1"
 
 [build-dependencies]
 winres = "0.1"

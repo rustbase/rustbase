@@ -789,6 +789,7 @@ dependencies = [
  "pest_derive",
  "proctitle",
  "rand",
+ "rayon",
  "rustls",
  "rustls-pemfile",
  "serde",
