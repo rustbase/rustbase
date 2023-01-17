@@ -1,4 +1,21 @@
-WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+program = _{ SOI ~ "\n"* ~ (stmt ~ "&"+) * ~ stmt? ~ EOI }
+stmt = _{ expr }
+
+expr = {
+      assgmtExpr
+    | monadicExpr
+    | intoExpr
+    | sglExpr
+    | terms
+}
+
+// exprs
+assgmtExpr = { ident ~ "=" ~ expr }
+monadicExpr = { keyword ~ verb ~ ((expr | ident)+)? }
+intoExpr = { keyword ~ json ~ "into" ~ ident }
+sglExpr = { keyword ~ ident? }
+
+// terms
 object = {
     "{" ~ "}" |
     "{" ~ pair ~ ("," ~ pair)* ~ "}"
@@ -10,9 +27,7 @@ array = {
     "[" ~ value ~ ("," ~ value)* ~ "]"
 }
 value = _{ object | array | string | number | boolean | null }
-
 boolean = { "true" | "false" }
-
 null = { "null" }
 string = ${ "\"" ~ inner ~ "\"" }
 inner = @{ char* }
@@ -28,18 +43,16 @@ number = @{
     ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?
 }
 json = _{ value }
+ident = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 
-d_get = _{ "get" }
-d_insert = _{ "insert" }
-d_update = _{ "update" | "upd" }
-d_delete = _{ "delete" | "del" }
-d_list = _{ "list" | "ls" }
-d_database = { "database" | "db" }
+terms = { term+ }
+term = _{ json }
 
-insert = { SOI ~ d_insert ~ json ~ "in" ~ inner ~ EOI}
-update = { SOI ~ d_update ~ json ~ "in" ~ inner ~ EOI}
-delete = { SOI ~  (d_delete ~ d_database ~ inner ~ EOI) | (d_delete ~ inner ~ EOI) }
-get = { SOI ~ d_get ~ inner ~ EOI}
-list = { SOI ~ (d_list ~ EOI) | (d_list ~ inner ~ EOI)}
+// verbs
+verb = { "user" | "database" }
 
-crud = _{insert | get | update | delete | list}
+// keyword
+keyword = { "insert" | "get" | "delete" | "update" | "list"}
+
+WHITESPACE = _{ " " | "\t" | "\n" }
+COMMENT = _{ "#" ~ (!"\n" ~ ANY)* }

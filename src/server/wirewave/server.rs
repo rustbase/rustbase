@@ -75,7 +75,7 @@ impl<T: Wirewave> Server<T> {
         }
     }
 
-    pub async fn serve_tls<A: ToSocketAddrs>(self, addr: A, tls_config: Tls) {
+    pub async fn serve_tls<A: ToSocketAddrs>(self, addr: A, tls_config: &Tls) {
         let certs = load_certs(&tls_config.ca_file).unwrap();
         let keys = load_keys(&tls_config.pem_key_file).unwrap();
 

@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::fs;
 use std::path;
 use std::sync::Arc;
@@ -32,8 +32,8 @@ pub fn get_existing_routes(data_path: String) -> Vec<String> {
     routes
 }
 
-pub fn initialize_dustdata(path: String) -> Arc<Mutex<BTreeMap<String, DustData>>> {
-    let mut routers = BTreeMap::new();
+pub fn initialize_dustdata(path: String) -> Arc<Mutex<HashMap<String, DustData>>> {
+    let mut routers = HashMap::new();
     let routes = get_existing_routes(path.clone());
 
     if !routes.is_empty() {
@@ -59,4 +59,8 @@ pub fn remove_dustdata(data_path: String, route: String) {
     if path.exists() {
         fs::remove_dir_all(path).unwrap();
     }
+}
+
+pub fn create_dustdata(path: String) -> DustData {
+    dustdata::initialize(default_dustdata_config(path))
 }
