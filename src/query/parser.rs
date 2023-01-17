@@ -29,7 +29,7 @@ pub enum ASTNode {
     MonadicExpression {
         keyword: Keywords,
         verb: Verbs,
-        expr: Option<Vec<Box<ASTNode>>>,
+        expr: Option<Vec<ASTNode>>,
     },
 
     IntoExpression {
@@ -52,7 +52,7 @@ pub enum ASTNode {
 struct RustbaseParser;
 
 pub fn parse(input: &str) -> Result<Vec<ASTNode>> {
-    let pairs = match RustbaseParser::parse(Rule::program, &input) {
+    let pairs = match RustbaseParser::parse(Rule::program, input) {
         Ok(e) => e,
         Err(e) => {
             return Err(QueryError(QueryErrorType::SyntaxError, e.to_string()));
@@ -95,11 +95,11 @@ fn build_expr(pair: Pair<Rule>) -> Result<ASTNode> {
 
             let mut exprs = Vec::new();
 
-            if let Some(_) = expr {
+            if expr.is_some() {
                 for pair in pair.into_inner() {
                     match pair.as_rule() {
-                        Rule::expr => exprs.push(Box::new(build_expr(pair)?)),
-                        Rule::ident => exprs.push(Box::new(build_term(pair)?)),
+                        Rule::expr => exprs.push(build_expr(pair)?),
+                        Rule::ident => exprs.push(build_term(pair)?),
                         _ => {
                             continue;
                         }

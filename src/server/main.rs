@@ -48,16 +48,13 @@ impl Wirewave for Database {
         let database = body.get_str("database").unwrap();
         let query = body.get_str("query").unwrap();
 
-        let response = self
-            .pool
+        self.pool
             .install(move || match query::parser::parse(query) {
-                Err(e) => {
-                    return Ok(Response {
-                        message: Some(e.1),
-                        status: Status::SyntaxError,
-                        body: None,
-                    });
-                }
+                Err(e) => Ok(Response {
+                    message: Some(e.1),
+                    status: Status::SyntaxError,
+                    body: None,
+                }),
 
                 Ok(query) => {
                     let mut core = Core::new(
@@ -69,9 +66,7 @@ impl Wirewave for Database {
 
                     core.run(query[0].clone())
                 }
-            });
-
-        response
+            })
     }
 }
 

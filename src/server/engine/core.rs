@@ -51,7 +51,7 @@ impl Core {
                 keyword,
                 json,
                 ident,
-            } => self.into_expr(keyword, json, ident),
+            } => self.expr_into(keyword, *json, *ident),
 
             ASTNode::MonadicExpression {
                 keyword,
@@ -60,28 +60,26 @@ impl Core {
             } => self.monadic_expr(keyword, verb, expr),
 
             ASTNode::SingleExpression { keyword, ident } => self.sgl_expr(keyword, ident),
-            _ => {
-                return Err(Status::SyntaxError);
-            }
+            _ => Err(Status::SyntaxError),
         }
     }
 
-    fn into_expr(
+    fn expr_into(
         &mut self,
         keyword: Keywords,
-        value: Box<ASTNode>,
-        expr: Box<ASTNode>,
+        value: ASTNode,
+        expr: ASTNode,
     ) -> Result<Response, Status> {
         match keyword {
             Keywords::Insert => {
-                let key = match *expr {
+                let key = match expr {
                     ASTNode::Identifier(ident) => ident,
                     _ => {
                         unreachable!()
                     }
                 };
 
-                let value = match *value {
+                let value = match value {
                     ASTNode::Bson(json) => json,
                     _ => {
                         unreachable!()
@@ -100,14 +98,14 @@ impl Core {
             }
 
             Keywords::Update => {
-                let key = match *expr {
+                let key = match expr {
                     ASTNode::Identifier(ident) => ident,
                     _ => {
                         unreachable!()
                     }
                 };
 
-                let value = match *value {
+                let value = match value {
                     ASTNode::Bson(json) => json,
                     _ => {
                         unreachable!()
@@ -125,7 +123,7 @@ impl Core {
                 }
             }
 
-            _ => return Err(Status::SyntaxError),
+            _ => Err(Status::SyntaxError),
         }
     }
 
@@ -133,20 +131,18 @@ impl Core {
         &mut self,
         keyword: Keywords,
         verb: Verbs,
-        expr: Option<Vec<Box<ASTNode>>>,
+        expr: Option<Vec<ASTNode>>,
     ) -> Result<Response, Status> {
         match keyword {
             Keywords::Delete => match verb {
                 Verbs::Database => {
                     let database = if let Some(expr) = expr {
-                        let database = match *expr[0] {
+                        match expr[0] {
                             ASTNode::Identifier(ref ident) => ident.clone(),
                             _ => {
                                 unreachable!()
                             }
-                        };
-
-                        database
+                        }
                     } else {
                         self.current_database.clone()
                     };
@@ -162,14 +158,10 @@ impl Core {
                     }
                 }
 
-                _ => {
-                    return Err(Status::SyntaxError);
-                }
+                _ => Err(Status::SyntaxError),
             },
 
-            _ => {
-                return Err(Status::SyntaxError);
-            }
+            _ => Err(Status::SyntaxError),
         }
     }
 
@@ -231,9 +223,7 @@ impl Core {
                 Err(e) => self.dd_error(e),
             },
 
-            _ => {
-                return Err(Status::SyntaxError);
-            }
+            _ => Err(Status::SyntaxError),
         }
     }
 
@@ -258,7 +248,7 @@ impl Core {
         let dd = routers.get_mut(&self.current_database).unwrap();
 
         dd.insert(&key, value)
-            .map_err(|e| TransactionError::InternalError(e))
+            .map_err(TransactionError::InternalError)
     }
 
     fn update_dustdata(&mut self, key: String, value: Bson) -> Result<(), TransactionError> {
@@ -267,7 +257,7 @@ impl Core {
 
         if let Some(dd) = dd {
             dd.update(&key, value)
-                .map_err(|e| TransactionError::InternalError(e))
+                .map_err(TransactionError::InternalError)
         } else {
             Err(TransactionError::ExternalError(
                 Status::DatabaseNotFound,
@@ -281,8 +271,7 @@ impl Core {
         let dd = routers.get_mut(&self.current_database);
 
         if let Some(dd) = dd {
-            dd.delete(&key)
-                .map_err(|e| TransactionError::InternalError(e))
+            dd.delete(&key).map_err(TransactionError::InternalError)
         } else {
             Err(TransactionError::ExternalError(
                 Status::DatabaseNotFound,
@@ -304,9 +293,7 @@ impl Core {
         let dd = routers.get_mut(&self.current_database);
 
         if let Some(dd) = dd {
-            let value = dd
-                .get(&key)
-                .map_err(|e| TransactionError::InternalError(e))?;
+            let value = dd.get(&key).map_err(TransactionError::InternalError)?;
 
             if let Some(bson) = value {
                 cache.insert(cache_key, bson.clone()).unwrap();
@@ -330,8 +317,7 @@ impl Core {
         let mut routers = self.routers.lock().unwrap();
         let dd = routers.get_mut(&self.current_database).unwrap();
 
-        dd.list_keys()
-            .map_err(|e| TransactionError::InternalError(e))
+        dd.list_keys().map_err(TransactionError::InternalError)
     }
 
     fn delete_database(&mut self, database: String) -> Result<(), TransactionError> {
