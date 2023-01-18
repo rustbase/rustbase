@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::future::Future;
 use std::io::{self, BufReader};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
@@ -61,9 +61,9 @@ pub struct Server<T: Wirewave> {
 }
 
 impl<T: Wirewave> Server<T> {
-    pub fn new(svc: WirewaveServer<T>, auth_database: dustdata::DustData) -> Self {
+    pub fn new(svc: WirewaveServer<T>, system_db: Arc<RwLock<dustdata::DustData>>) -> Self {
         let auth_provider = authentication::DefaultAuthenticationProvider {
-            dustdata: Arc::new(Mutex::new(auth_database)),
+            dustdata: system_db,
         };
 
         Self { svc, auth_provider }

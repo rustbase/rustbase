@@ -5,7 +5,7 @@ use rayon::{ThreadPool, ThreadPoolBuilder};
 
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 use super::cache;
 use super::engine;
@@ -22,9 +22,10 @@ use wirewave::server::{Request, Response, Server, Status, Wirewave, WirewaveServ
 
 pub struct Database {
     pool: ThreadPool,
-    routers: Arc<Mutex<HashMap<String, DustData>>>,
+    routers: Arc<RwLock<HashMap<String, DustData>>>,
     config: Arc<schema::RustbaseConfig>,
-    cache: Arc<Mutex<Cache>>,
+    cache: Arc<RwLock<Cache>>,
+    system_db: Arc<RwLock<dustdata::DustData>>,
 }
 
 #[async_trait]
@@ -56,6 +57,7 @@ impl Wirewave for Database {
                         self.cache.clone(),
                         self.routers.clone(),
                         self.config.clone(),
+                        self.system_db.clone(),
                         database.to_string(),
                     );
 
@@ -72,12 +74,12 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
     let path = Path::new(&config.database.path);
 
     let routers = route::initialize_dustdata(path);
-    let cache = Arc::new(Mutex::new(Cache::new(config.database.cache_size)));
+    let cache = Arc::new(RwLock::new(Cache::new(config.database.cache_size)));
 
     let c_routers = routers.clone();
     ctrlc::set_handler(move || {
         c_routers
-            .lock()
+            .write()
             .unwrap()
             .iter_mut()
             .for_each(|(route, dd)| {
@@ -96,11 +98,16 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
         .build()
         .unwrap();
 
+    let system_db = Arc::new(RwLock::new(DustData::new(default_dustdata_config(
+        &path.join("_default"),
+    ))));
+
     let database = Database {
         pool,
         routers,
-        config: Arc::clone(&config),
         cache,
+        config: Arc::clone(&config),
+        system_db: Arc::clone(&system_db),
     };
 
     let svc = WirewaveServer::new(database);
@@ -110,9 +117,7 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
         format!("rustbase://{}", addr).yellow()
     );
 
-    let auth_database = dustdata::initialize(default_dustdata_config(&path.join("_default")));
-
-    let server = Server::new(svc, auth_database);
+    let server = Server::new(svc, system_db);
 
     if let Some(tls) = &config.tls {
         server.serve_tls(addr, tls).await;

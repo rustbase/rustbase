@@ -1,17 +1,17 @@
 use scram::{AuthenticationProvider, AuthenticationStatus, PasswordInfo, ScramServer};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 #[derive(Clone)]
 pub struct DefaultAuthenticationProvider {
-    pub dustdata: Arc<Mutex<dustdata::DustData>>,
+    pub dustdata: Arc<RwLock<dustdata::DustData>>,
 }
 
 impl AuthenticationProvider for DefaultAuthenticationProvider {
     fn get_password_for(&self, username: &str) -> Option<PasswordInfo> {
-        let dustdata = self.dustdata.lock().unwrap();
+        let dustdata = self.dustdata.read().unwrap();
 
         let user = dustdata.get(username).unwrap();
 

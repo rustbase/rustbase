@@ -3,7 +3,7 @@ use std::fs;
 use std::path;
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::Mutex;
+use std::sync::RwLock;
 
 use colored::Colorize;
 use dustdata::DustData;
@@ -33,7 +33,7 @@ pub fn get_existing_routes(data_path: &Path) -> Vec<String> {
     routes
 }
 
-pub fn initialize_dustdata(path: &Path) -> Arc<Mutex<HashMap<String, DustData>>> {
+pub fn initialize_dustdata(path: &Path) -> Arc<RwLock<HashMap<String, DustData>>> {
     let mut routers = HashMap::new();
     let routes = get_existing_routes(path);
 
@@ -52,7 +52,7 @@ pub fn initialize_dustdata(path: &Path) -> Arc<Mutex<HashMap<String, DustData>>>
         }
     }
 
-    Arc::new(Mutex::new(routers))
+    Arc::new(RwLock::new(routers))
 }
 
 pub fn remove_dustdata(data_path: &Path, route: String) {

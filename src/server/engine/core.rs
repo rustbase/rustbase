@@ -5,7 +5,7 @@ use rand::Rng;
 use scram::hash_password;
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 use crate::config;
 use crate::query;
@@ -21,10 +21,11 @@ use query::parser::{ASTNode, Keywords, Verbs};
 use wirewave::server::{Response, Status};
 
 pub struct Core {
-    cache: Arc<Mutex<Cache>>,
-    routers: Arc<Mutex<HashMap<String, DustData>>>,
+    cache: Arc<RwLock<Cache>>,
+    routers: Arc<RwLock<HashMap<String, DustData>>>,
     config: Arc<schema::RustbaseConfig>,
     current_database: String,
+    system_db: Arc<RwLock<DustData>>,
 }
 
 enum TransactionError {
@@ -34,9 +35,10 @@ enum TransactionError {
 
 impl Core {
     pub fn new(
-        cache: Arc<Mutex<Cache>>,
-        routers: Arc<Mutex<HashMap<String, DustData>>>,
+        cache: Arc<RwLock<Cache>>,
+        routers: Arc<RwLock<HashMap<String, DustData>>>,
         config: Arc<schema::RustbaseConfig>,
+        system_db: Arc<RwLock<DustData>>,
         current_database: String,
     ) -> Self {
         Self {
@@ -44,6 +46,7 @@ impl Core {
             routers,
             config,
             current_database,
+            system_db,
         }
     }
 
@@ -323,7 +326,7 @@ impl Core {
             ));
         }
 
-        let mut routers = self.routers.lock().unwrap();
+        let mut routers = self.routers.write().unwrap();
 
         if !routers.contains_key(&self.current_database) {
             let dd = route::create_dustdata(
@@ -348,7 +351,7 @@ impl Core {
             ));
         }
 
-        let mut routers = self.routers.lock().unwrap();
+        let mut routers = self.routers.write().unwrap();
         let dd = routers.get_mut(&self.current_database);
 
         if let Some(dd) = dd {
@@ -370,7 +373,7 @@ impl Core {
             ));
         }
 
-        let mut routers = self.routers.lock().unwrap();
+        let mut routers = self.routers.write().unwrap();
         let dd = routers.get_mut(&self.current_database);
 
         if let Some(dd) = dd {
@@ -391,7 +394,7 @@ impl Core {
             ));
         }
 
-        let mut cache = self.cache.lock().unwrap();
+        let mut cache = self.cache.write().unwrap();
 
         let cache_key = format!("{}:{}", self.current_database, key);
 
@@ -399,7 +402,7 @@ impl Core {
             return Ok(bson.clone());
         }
 
-        let mut routers = self.routers.lock().unwrap();
+        let mut routers = self.routers.write().unwrap();
         let dd = routers.get_mut(&self.current_database);
 
         if let Some(dd) = dd {
@@ -431,7 +434,7 @@ impl Core {
             ));
         }
 
-        let mut routers = self.routers.lock().unwrap();
+        let mut routers = self.routers.write().unwrap();
         let dd = routers.get_mut(&self.current_database).unwrap();
 
         dd.list_keys().map_err(TransactionError::InternalError)
@@ -445,7 +448,7 @@ impl Core {
             ));
         }
 
-        let mut routers = self.routers.lock().unwrap();
+        let mut routers = self.routers.write().unwrap();
 
         if let Some(mut dd) = routers.remove(&database) {
             dd.lsm.drop();
@@ -473,10 +476,9 @@ impl Core {
 
     // auth interface
     fn create_user(&mut self, username: String, password: String) -> Result<(), TransactionError> {
-        let mut routers = self.routers.lock().unwrap();
-        let dd = routers.get_mut("_default").unwrap();
-        let salt = rand::thread_rng().gen::<[u8; 32]>().to_vec();
+        let mut dd = self.system_db.write().unwrap();
 
+        let salt = rand::thread_rng().gen::<[u8; 32]>().to_vec();
         let hash_password =
             hash_password(&password, std::num::NonZeroU32::new(4096).unwrap(), &salt).to_vec();
 
