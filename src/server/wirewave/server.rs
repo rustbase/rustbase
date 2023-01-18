@@ -191,18 +191,6 @@ pub fn process_request(buf: &[u8]) -> Result<Request, Response> {
         }
     };
 
-    // if let Some(is_auth) = check_auth(request.clone()) {
-    //     if !is_auth {
-    //         let response = Response {
-    //             message: None,
-    //             status: Status::InvalidAuth,
-    //             body: None,
-    //         };
-
-    //         return Err(response);
-    //     }
-    // }
-
     Ok(request)
 }
 
