@@ -247,7 +247,28 @@ impl Core {
                     }
                 }
 
-                _ => Err(Status::SyntaxError),
+                Verbs::User => {
+                    let user = if let Some(expr) = expr {
+                        match expr[0] {
+                            ASTNode::Identifier(ref ident) => ident.clone(),
+                            _ => {
+                                unreachable!()
+                            }
+                        }
+                    } else {
+                        return Err(Status::SyntaxError);
+                    };
+
+                    match self.delete_user(user) {
+                        Ok(_) => Ok(Response {
+                            message: None,
+                            status: Status::Ok,
+                            body: None,
+                        }),
+
+                        Err(e) => self.dd_error(e),
+                    }
+                }
             },
 
             _ => Err(Status::SyntaxError),
@@ -500,6 +521,13 @@ impl Core {
             }),
         )
         .map_err(TransactionError::InternalError)
+    }
+
+    fn delete_user(&mut self, username: String) -> Result<(), TransactionError> {
+        let mut dd = self.system_db.write().unwrap();
+
+        dd.delete(&username)
+            .map_err(TransactionError::InternalError)
     }
 
     // error
