@@ -2,7 +2,9 @@ use async_trait::async_trait;
 use colored::Colorize;
 use dustdata::{DustData, DustDataConfig, LsmConfig, Size};
 use rayon::{ThreadPool, ThreadPoolBuilder};
+
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use super::cache;
@@ -30,20 +32,13 @@ impl Wirewave for Database {
     async fn request(&self, request: Request) -> Result<Response, Status> {
         let body = request.body;
 
-        let body = match body.as_document() {
-            None => return Err(Status::InvalidBody),
-            Some(body) => {
-                if body.is_empty() {
-                    return Err(Status::InvalidBody);
-                }
+        if body.is_empty() {
+            return Err(Status::InvalidBody);
+        }
 
-                if !body.contains_key("query") || !body.contains_key("database") {
-                    return Err(Status::InvalidBody);
-                }
-
-                body
-            }
-        };
+        if !body.contains_key("query") || !body.contains_key("database") {
+            return Err(Status::InvalidBody);
+        }
 
         let database = body.get_str("database").unwrap();
         let query = body.get_str("query").unwrap();
@@ -74,7 +69,9 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
     let config = Arc::new(config);
     let addr = format!("{}:{}", config.net.host, config.net.port);
 
-    let routers = route::initialize_dustdata(Arc::clone(&config).database.path.clone());
+    let path = Path::new(&config.database.path);
+
+    let routers = route::initialize_dustdata(path);
     let cache = Arc::new(Mutex::new(Cache::new(config.database.cache_size)));
 
     let c_routers = routers.clone();
@@ -87,6 +84,9 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
                 println!("[Server] flushing {} to exit", route.yellow());
                 dd.flush().unwrap();
             });
+
+        println!("[Server] flushing _default database to exit");
+
         std::process::exit(0);
     })
     .expect("Error setting Ctrl-C handler");
@@ -110,19 +110,21 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
         format!("rustbase://{}", addr).yellow()
     );
 
+    let auth_database = dustdata::initialize(default_dustdata_config(&path.join("_default")));
+
+    let server = Server::new(svc, auth_database);
+
     if let Some(tls) = &config.tls {
-        Server::new(svc).serve_tls(addr, tls).await;
+        server.serve_tls(addr, tls).await;
     } else {
-        Server::new(svc).serve(addr).await;
+        server.serve(addr).await;
     }
 }
 
-pub fn default_dustdata_config(data_path: String) -> DustDataConfig {
+pub fn default_dustdata_config(data_path: &Path) -> DustDataConfig {
     DustDataConfig {
-        path: data_path,
-        verbose: true,
+        path: data_path.to_str().unwrap().to_string(),
         lsm_config: LsmConfig {
-            detect_exit_signals: false,
             flush_threshold: Size::Megabytes(256),
         },
     }

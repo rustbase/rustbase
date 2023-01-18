@@ -1,19 +1,27 @@
-use crate::config::schema::Tls;
-use crate::server::auth::check_auth;
-
 use async_trait::async_trait;
-use rustls_pemfile::{certs, pkcs8_private_keys};
 use serde::{Deserialize, Serialize};
+
 use std::fs::File;
+use std::future::Future;
 use std::io::{self, BufReader};
-use std::{future::Future, sync::Arc};
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::{TcpListener, TcpStream, ToSocketAddrs},
-};
+use std::sync::{Arc, Mutex};
+
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
+
+use rustls_pemfile::{certs, pkcs8_private_keys};
 use tokio_rustls::rustls::{self, Certificate, PrivateKey};
 use tokio_rustls::server::TlsStream;
 use tokio_rustls::TlsAcceptor;
+
+use scram::{AuthenticationStatus, ScramServer};
+
+use super::authentication;
+use crate::config;
+
+use authentication::authentication_challenge;
+
+use config::schema::Tls;
 
 fn load_certs(path: &String) -> io::Result<Vec<Certificate>> {
     certs(&mut BufReader::new(File::open(path)?))
@@ -49,23 +57,40 @@ struct _Inner<T>(Arc<T>);
 
 pub struct Server<T: Wirewave> {
     svc: WirewaveServer<T>,
+    auth_provider: authentication::DefaultAuthenticationProvider,
 }
 
 impl<T: Wirewave> Server<T> {
-    pub fn new(svc: WirewaveServer<T>) -> Self {
-        Self { svc }
+    pub fn new(svc: WirewaveServer<T>, auth_database: dustdata::DustData) -> Self {
+        let auth_provider = authentication::DefaultAuthenticationProvider {
+            dustdata: Arc::new(Mutex::new(auth_database)),
+        };
+
+        Self { svc, auth_provider }
     }
 
     pub async fn serve<A: ToSocketAddrs>(self, addr: A) {
         let listener = TcpListener::bind(addr).await.unwrap();
 
         loop {
-            let (stream, addr) = listener.accept().await.unwrap();
+            let (mut stream, addr) = listener.accept().await.unwrap();
 
             let svc = self.svc.clone();
 
+            let server = ScramServer::new(self.auth_provider.clone());
+
             tokio::spawn(async move {
                 println!("[Wirewave] incoming connection: {}", addr);
+
+                let status = authentication_challenge(server, &mut stream).await;
+
+                if status != AuthenticationStatus::Authenticated {
+                    println!("[Wirewave] authentication failed: {:?}", status);
+                    stream.shutdown().await.unwrap();
+
+                    return;
+                }
+
                 handle_connection(stream, move |request| {
                     let svc = svc.clone();
                     async move { svc.inner.0.request(request).await }
@@ -127,7 +152,7 @@ impl<T: Wirewave> Clone for _Inner<T> {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Request {
     pub auth: Option<String>,
-    pub body: bson::Bson,
+    pub body: bson::Document,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -166,17 +191,17 @@ pub fn process_request(buf: &[u8]) -> Result<Request, Response> {
         }
     };
 
-    if let Some(is_auth) = check_auth(request.clone()) {
-        if !is_auth {
-            let response = Response {
-                message: None,
-                status: Status::InvalidAuth,
-                body: None,
-            };
+    // if let Some(is_auth) = check_auth(request.clone()) {
+    //     if !is_auth {
+    //         let response = Response {
+    //             message: None,
+    //             status: Status::InvalidAuth,
+    //             body: None,
+    //         };
 
-            return Err(response);
-        }
-    }
+    //         return Err(response);
+    //     }
+    // }
 
     Ok(request)
 }

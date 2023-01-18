@@ -1,6 +1,8 @@
 use bson::Bson;
 use dustdata::DustData;
 use dustdata::Error as DustDataError;
+use rand::Rng;
+use scram::hash_password;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -134,6 +136,90 @@ impl Core {
         expr: Option<Vec<ASTNode>>,
     ) -> Result<Response, Status> {
         match keyword {
+            Keywords::Insert => match verb {
+                Verbs::User => {
+                    if expr.is_none() {
+                        return Err(Status::SyntaxError);
+                    }
+
+                    let expr = expr.unwrap();
+
+                    if expr.len() != 2 {
+                        return Err(Status::SyntaxError);
+                    }
+
+                    let mut username = String::new();
+                    let mut password = String::new();
+
+                    // idk if this is the best way to do this
+                    for node in expr {
+                        match node {
+                            // this will find the username and password
+                            ASTNode::AssignmentExpression { ident, value } => {
+                                match ident.as_str() {
+                                    // this will find the password
+                                    "username" => {
+                                        username = match *value {
+                                            ASTNode::Bson(s) => {
+                                                let s = s.as_str();
+
+                                                // if the username is not a string, return an error
+                                                if let Some(s) = s {
+                                                    s.to_string()
+                                                } else {
+                                                    return Err(Status::SyntaxError);
+                                                }
+                                            }
+                                            _ => {
+                                                unreachable!()
+                                            }
+                                        }
+                                    }
+
+                                    // this will find the password
+                                    "password" => {
+                                        password = match *value {
+                                            ASTNode::Bson(s) => {
+                                                let s = s.as_str();
+
+                                                // if the username is not a string, return an error
+                                                if let Some(s) = s {
+                                                    s.to_string()
+                                                } else {
+                                                    return Err(Status::SyntaxError);
+                                                }
+                                            }
+                                            _ => {
+                                                unreachable!()
+                                            }
+                                        }
+                                    }
+
+                                    _ => {}
+                                }
+                            }
+
+                            _ => {
+                                println!("{:?}", node);
+                                unreachable!()
+                            }
+                        }
+                    }
+
+                    match self.create_user(username, password) {
+                        Ok(_) => Ok(Response {
+                            message: None,
+                            status: Status::Ok,
+                            body: None,
+                        }),
+
+                        Err(e) => self.dd_error(e),
+                    }
+                }
+
+                _ => Err(Status::SyntaxError),
+            },
+
             Keywords::Delete => match verb {
                 Verbs::Database => {
                     let database = if let Some(expr) = expr {
@@ -227,18 +313,21 @@ impl Core {
         }
     }
 
-    // dd interface
+    // user dd interface
 
     fn insert_into_dustdata(&mut self, key: String, value: Bson) -> Result<(), TransactionError> {
+        if self.current_database == "_default" {
+            return Err(TransactionError::ExternalError(
+                Status::Error,
+                "database.reserved".to_string(),
+            ));
+        }
+
         let mut routers = self.routers.lock().unwrap();
 
         if !routers.contains_key(&self.current_database) {
             let dd = route::create_dustdata(
-                Path::new(&self.config.database.path)
-                    .join(self.current_database.clone())
-                    .to_str()
-                    .unwrap()
-                    .to_string(),
+                &Path::new(&self.config.database.path).join(self.current_database.clone()),
             );
 
             routers.insert(self.current_database.clone(), dd);
@@ -252,6 +341,13 @@ impl Core {
     }
 
     fn update_dustdata(&mut self, key: String, value: Bson) -> Result<(), TransactionError> {
+        if self.current_database == "_default" {
+            return Err(TransactionError::ExternalError(
+                Status::Error,
+                "database.reserved".to_string(),
+            ));
+        }
+
         let mut routers = self.routers.lock().unwrap();
         let dd = routers.get_mut(&self.current_database);
 
@@ -267,6 +363,13 @@ impl Core {
     }
 
     fn delete_from_dustdata(&mut self, key: String) -> Result<(), TransactionError> {
+        if self.current_database == "_default" {
+            return Err(TransactionError::ExternalError(
+                Status::Error,
+                "database.reserved".to_string(),
+            ));
+        }
+
         let mut routers = self.routers.lock().unwrap();
         let dd = routers.get_mut(&self.current_database);
 
@@ -281,6 +384,13 @@ impl Core {
     }
 
     fn get_from_dustdata(&mut self, key: String) -> Result<Bson, TransactionError> {
+        if self.current_database == "_default" {
+            return Err(TransactionError::ExternalError(
+                Status::Error,
+                "database.reserved".to_string(),
+            ));
+        }
+
         let mut cache = self.cache.lock().unwrap();
 
         let cache_key = format!("{}:{}", self.current_database, key);
@@ -314,6 +424,13 @@ impl Core {
     }
 
     fn list_from_dustdata(&mut self) -> Result<Vec<String>, TransactionError> {
+        if self.current_database == "_default" {
+            return Err(TransactionError::ExternalError(
+                Status::Error,
+                "database.reserved".to_string(),
+            ));
+        }
+
         let mut routers = self.routers.lock().unwrap();
         let dd = routers.get_mut(&self.current_database).unwrap();
 
@@ -321,6 +438,13 @@ impl Core {
     }
 
     fn delete_database(&mut self, database: String) -> Result<(), TransactionError> {
+        if self.current_database == "_default" {
+            return Err(TransactionError::ExternalError(
+                Status::Error,
+                "database.reserved".to_string(),
+            ));
+        }
+
         let mut routers = self.routers.lock().unwrap();
 
         if let Some(mut dd) = routers.remove(&database) {
@@ -333,7 +457,7 @@ impl Core {
             let c_db = database.clone();
             let c_path = self.config.database.path.clone();
             std::thread::spawn(move || {
-                route::remove_dustdata(c_path, c_db);
+                route::remove_dustdata(&c_path, c_db);
             });
 
             println!("[Engine] database {} deleted", database);
@@ -347,7 +471,36 @@ impl Core {
         }
     }
 
-    // -- error
+    // auth interface
+    fn create_user(&mut self, username: String, password: String) -> Result<(), TransactionError> {
+        let mut routers = self.routers.lock().unwrap();
+        let dd = routers.get_mut("_default").unwrap();
+        let salt = rand::thread_rng().gen::<[u8; 32]>().to_vec();
+
+        let hash_password =
+            hash_password(&password, std::num::NonZeroU32::new(4096).unwrap(), &salt).to_vec();
+
+        let hash_password = bson::Binary {
+            subtype: bson::spec::BinarySubtype::Generic,
+            bytes: hash_password,
+        };
+
+        let salt = bson::Binary {
+            subtype: bson::spec::BinarySubtype::Generic,
+            bytes: salt,
+        };
+
+        dd.insert(
+            &username,
+            Bson::Document(bson::doc! {
+                "password": hash_password,
+                "salt": salt,
+            }),
+        )
+        .map_err(TransactionError::InternalError)
+    }
+
+    // error
     fn dd_error(&self, error: TransactionError) -> Result<Response, Status> {
         match error {
             TransactionError::InternalError(e) => {

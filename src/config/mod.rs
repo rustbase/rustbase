@@ -19,8 +19,7 @@ pub fn default_configuration() -> schema::RustbaseConfig {
                 .join("./data")
                 .absolutize()
                 .unwrap()
-                .display()
-                .to_string(),
+                .to_path_buf(),
             threads: num_cpus::get(),
             cache_size: spec::DEFAULT_CACHE_SIZE,
         },
@@ -98,9 +97,7 @@ pub fn load_configuration() -> schema::RustbaseConfig {
         .join(&config.database.path)
         .absolutize()
         .unwrap()
-        .to_str()
-        .unwrap()
-        .to_string();
+        .to_path_buf();
 
     println!(
         "[Config] {} loaded",
@@ -109,14 +106,4 @@ pub fn load_configuration() -> schema::RustbaseConfig {
     println!("[Config] load config: {}", config);
 
     config
-}
-
-pub fn get_auth_config() -> Option<schema::Auth> {
-    if let Ok(username) = var("RUSTBASE_INIT_USER") {
-        if let Ok(password) = var("RUSTBASE_INIT_PASS") {
-            return Some(schema::Auth { username, password });
-        }
-    }
-
-    None
 }

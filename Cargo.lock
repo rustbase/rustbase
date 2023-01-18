@@ -297,14 +297,13 @@ dependencies = [
 
 [[package]]
 name = "dustdata"
-version = "1.1.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eea6dddca08e04632e0a994277ba9d982aae059f1048611f1c00d471716c17ce"
+checksum = "765c873aa9c0ca4f15f5c49315e9a2b41bce21cead2f5049b96ebfb34c87e834"
 dependencies = [
  "bitvec",
  "bson",
  "chrono",
- "ctrlc",
  "farmhash",
  "hex",
  "lz4",
@@ -792,6 +791,7 @@ dependencies = [
  "rayon",
  "rustls",
  "rustls-pemfile",
+ "scram",
  "serde",
  "serde_json",
  "sysinfo",
@@ -832,6 +832,17 @@ name = "scopeguard"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
+
+[[package]]
+name = "scram"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7679a5e6b97bac99b2c208894ba0d34b17d9657f0b728c1cd3bf1c5f7f6ebe88"
+dependencies = [
+ "base64",
+ "rand",
+ "ring",
+]
 
 [[package]]
 name = "scratch"

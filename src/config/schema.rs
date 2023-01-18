@@ -18,7 +18,7 @@ pub struct Net {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Database {
-    pub path: String,
+    pub path: std::path::PathBuf,
     pub cache_size: usize,
     pub threads: usize,
 }
@@ -137,7 +137,12 @@ impl Display for Database {
             IDENT,
             parse_size_to_string(self.cache_size).cyan()
         )?;
-        writeln!(f, "{}path: {}", IDENT, self.path.cyan())?;
+        writeln!(
+            f,
+            "{}path: {}",
+            IDENT,
+            self.path.display().to_string().cyan()
+        )?;
         Ok(())
     }
 }
