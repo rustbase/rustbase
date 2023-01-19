@@ -252,6 +252,10 @@ impl Core {
     }
 
     fn update_dustdata(&mut self, key: String, value: Bson) -> Result<(), TransactionError> {
+        let mut cache = self.cache.lock().unwrap();
+        let cache_key = format!("{}:{}", self.current_database, key);
+        cache.remove(&cache_key).ok();
+
         let mut routers = self.routers.lock().unwrap();
         let dd = routers.get_mut(&self.current_database);
 
@@ -267,6 +271,10 @@ impl Core {
     }
 
     fn delete_from_dustdata(&mut self, key: String) -> Result<(), TransactionError> {
+        let mut cache = self.cache.lock().unwrap();
+        let cache_key = format!("{}:{}", self.current_database, key);
+        cache.remove(&cache_key).ok();
+
         let mut routers = self.routers.lock().unwrap();
         let dd = routers.get_mut(&self.current_database);
 
