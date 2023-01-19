@@ -58,15 +58,24 @@ struct _Inner<T>(Arc<T>);
 pub struct Server<T: Wirewave> {
     svc: WirewaveServer<T>,
     auth_provider: authentication::DefaultAuthenticationProvider,
+    require_authentication: bool,
 }
 
 impl<T: Wirewave> Server<T> {
-    pub fn new(svc: WirewaveServer<T>, system_db: Arc<RwLock<dustdata::DustData>>) -> Self {
+    pub fn new(
+        svc: WirewaveServer<T>,
+        system_db: Arc<RwLock<dustdata::DustData>>,
+        require_authentication: bool,
+    ) -> Self {
         let auth_provider = authentication::DefaultAuthenticationProvider {
             dustdata: system_db,
         };
 
-        Self { svc, auth_provider }
+        Self {
+            svc,
+            auth_provider,
+            require_authentication,
+        }
     }
 
     pub async fn serve<A: ToSocketAddrs>(self, addr: A) {
@@ -82,13 +91,15 @@ impl<T: Wirewave> Server<T> {
             tokio::spawn(async move {
                 println!("[Wirewave] incoming connection: {}", addr);
 
-                let status = authentication_challenge(server, &mut stream).await;
+                if self.require_authentication {
+                    let status = authentication_challenge(server, &mut stream).await;
 
-                if status != AuthenticationStatus::Authenticated {
-                    println!("[Wirewave] authentication failed: {:?}", status);
-                    stream.shutdown().await.unwrap();
+                    if status != AuthenticationStatus::Authenticated {
+                        println!("[Wirewave] authentication failed: {:?}", status);
+                        stream.shutdown().await.unwrap();
 
-                    return;
+                        return;
+                    }
                 }
 
                 handle_connection(stream, move |request| {

@@ -67,6 +67,12 @@ impl Wirewave for Database {
     }
 }
 
+fn current_users(system_db: Arc<RwLock<DustData>>) -> usize {
+    let dd = system_db.read().unwrap();
+
+    dd.list_keys().unwrap().len()
+}
+
 pub async fn initalize_server(config: schema::RustbaseConfig) {
     let config = Arc::new(config);
     let addr = format!("{}:{}", config.net.host, config.net.port);
@@ -110,6 +116,10 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
         system_db: Arc::clone(&system_db),
     };
 
+    let users = current_users(Arc::clone(&system_db));
+
+    let use_auth = users > 0;
+
     let svc = WirewaveServer::new(database);
 
     println!(
@@ -117,7 +127,7 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
         format!("rustbase://{}", addr).yellow()
     );
 
-    let server = Server::new(svc, system_db);
+    let server = Server::new(svc, system_db, use_auth);
 
     if let Some(tls) = &config.tls {
         server.serve_tls(addr, tls).await;
