@@ -6,12 +6,11 @@ use std::future::Future;
 use std::io::{self, BufReader};
 use std::sync::{Arc, RwLock};
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::net::{TcpListener, ToSocketAddrs};
 
 use rustls_pemfile::{certs, pkcs8_private_keys};
 use tokio_rustls::rustls::{self, Certificate, PrivateKey};
-use tokio_rustls::server::TlsStream;
 use tokio_rustls::TlsAcceptor;
 
 use scram::{AuthenticationStatus, ScramServer};
@@ -136,7 +135,7 @@ impl<T: Wirewave> Server<T> {
                 let stream = acceptor.accept(stream).await.unwrap();
 
                 println!("[Wirewave] incoming connection: {}", addr);
-                handle_connection_tls(stream, move |request| {
+                handle_connection(stream, move |request| {
                     let svc = svc.clone();
                     async move { svc.inner.0.request(request).await }
                 })
@@ -205,56 +204,11 @@ pub fn process_request(buf: &[u8]) -> Result<Request, Response> {
     Ok(request)
 }
 
-pub async fn handle_connection<F, Fut>(mut socket: TcpStream, callback: F)
+pub async fn handle_connection<F, Fut, IO>(mut socket: IO, callback: F)
 where
     F: Fn(Request) -> Fut,
     Fut: Future<Output = Result<Response, Status>>,
-{
-    let mut buffer = vec![0; BUFFER_SIZE];
-
-    loop {
-        let mut request_bytes = Vec::new();
-
-        while let Ok(n) = socket.read(&mut buffer).await {
-            if n == 0 {
-                println!("[Wirewave] connection closed");
-                break;
-            }
-            request_bytes.extend_from_slice(&buffer[..n]);
-            if n < BUFFER_SIZE {
-                break;
-            }
-        }
-
-        match process_request(&request_bytes[..]) {
-            Ok(request) => {
-                let response = match callback(request).await {
-                    Ok(response) => response,
-                    Err(status) => Response {
-                        message: None,
-                        status,
-                        body: None,
-                    },
-                };
-
-                let response = bson::to_bson(&response).unwrap();
-                let response = bson::to_vec(&response).unwrap();
-
-                socket.write_all(&response).await.unwrap();
-            }
-            Err(response) => {
-                let response = bson::to_vec(&response).unwrap();
-
-                socket.write_all(&response).await.unwrap();
-            }
-        }
-    }
-}
-
-pub async fn handle_connection_tls<F, Fut>(mut socket: TlsStream<TcpStream>, callback: F)
-where
-    F: Fn(Request) -> Fut,
-    Fut: Future<Output = Result<Response, Status>>,
+    IO: AsyncRead + AsyncWrite + Unpin,
 {
     let mut buffer = vec![0; BUFFER_SIZE];
 
