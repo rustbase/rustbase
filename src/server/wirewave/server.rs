@@ -187,7 +187,7 @@ pub enum Status {
 }
 
 // if is ok, return request else return response and send to client
-pub fn process_request(buf: &[u8]) -> Result<Request, Response> {
+fn process_request(buf: &[u8]) -> Result<Request, Response> {
     let request: Request = match bson::from_slice(buf) {
         Ok(request) => request,
         Err(e) => {
@@ -204,7 +204,28 @@ pub fn process_request(buf: &[u8]) -> Result<Request, Response> {
     Ok(request)
 }
 
-pub async fn handle_connection<F, Fut, IO>(mut socket: IO, callback: F)
+pub async fn read_socket<IO>(socket: &mut IO, buffer: &mut [u8]) -> io::Result<Vec<u8>>
+where
+    IO: AsyncRead + AsyncWrite + Unpin,
+{
+    let mut request_bytes = Vec::new();
+
+    while let Ok(n) = socket.read(buffer).await {
+        if n == 0 {
+            break;
+        }
+
+        request_bytes.extend_from_slice(&buffer[..n]);
+
+        if n < BUFFER_SIZE {
+            break;
+        }
+    }
+
+    Ok(request_bytes)
+}
+
+async fn handle_connection<F, Fut, IO>(mut socket: IO, callback: F)
 where
     F: Fn(Request) -> Fut,
     Fut: Future<Output = Result<Response, Status>>,
@@ -213,18 +234,7 @@ where
     let mut buffer = vec![0; BUFFER_SIZE];
 
     loop {
-        let mut request_bytes = Vec::new();
-
-        while let Ok(n) = socket.read(&mut buffer).await {
-            if n == 0 {
-                println!("[Wirewave] connection closed");
-                break;
-            }
-            request_bytes.extend_from_slice(&buffer[..n]);
-            if n < BUFFER_SIZE {
-                break;
-            }
-        }
+        let request_bytes = read_socket(&mut socket, &mut buffer).await.unwrap();
 
         match process_request(&request_bytes[..]) {
             Ok(request) => {
@@ -240,12 +250,12 @@ where
                 let response = bson::to_bson(&response).unwrap();
                 let response = bson::to_vec(&response).unwrap();
 
-                socket.write_all(&response).await.unwrap();
+                socket.write_all(&response).await.ok();
             }
             Err(response) => {
                 let response = bson::to_vec(&response).unwrap();
 
-                socket.write_all(&response).await.unwrap();
+                socket.write_all(&response).await.ok();
             }
         }
     }

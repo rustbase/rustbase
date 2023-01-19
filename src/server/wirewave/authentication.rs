@@ -1,8 +1,14 @@
 use scram::{AuthenticationProvider, AuthenticationStatus, PasswordInfo, ScramServer};
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
+
+use super::server;
+
+use server::read_socket;
+use server::{Response, Status};
 
 #[derive(Clone)]
 pub struct DefaultAuthenticationProvider {
@@ -32,6 +38,28 @@ impl AuthenticationProvider for DefaultAuthenticationProvider {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct AuthRequest {
+    challenge: String,
+}
+
+fn process_authentication_request(buffer: &[u8]) -> Result<AuthRequest, Response> {
+    let request: AuthRequest = match bson::from_slice(buffer) {
+        Ok(request) => request,
+        Err(e) => {
+            let response = Response {
+                message: Some(e.to_string()),
+                status: Status::InvalidBson,
+                body: None,
+            };
+
+            return Err(response);
+        }
+    };
+
+    Ok(request)
+}
+
 #[allow(clippy::unused_io_amount)]
 pub async fn authentication_challenge(
     scram_server: ScramServer<DefaultAuthenticationProvider>,
@@ -39,8 +67,17 @@ pub async fn authentication_challenge(
 ) -> AuthenticationStatus {
     let mut buffer = vec![0; 1028];
 
-    let n = stream.read(&mut buffer).await.unwrap();
-    let client_first = String::from_utf8(buffer[..n].to_vec()).unwrap();
+    let client_first =
+        match process_authentication_request(&read_socket(stream, &mut buffer).await.unwrap()) {
+            Ok(request) => request.challenge,
+            Err(response) => {
+                stream
+                    .write_all(&bson::to_vec(&response).unwrap())
+                    .await
+                    .unwrap();
+                return AuthenticationStatus::NotAuthenticated;
+            }
+        };
 
     let scram_first = scram_server.handle_client_first(&client_first).unwrap();
 
@@ -48,8 +85,17 @@ pub async fn authentication_challenge(
 
     stream.write_all(server_first.as_bytes()).await.unwrap();
 
-    let n = stream.read(&mut buffer).await.unwrap();
-    let client_final = String::from_utf8(buffer[..n].to_vec()).unwrap();
+    let client_final =
+        match process_authentication_request(&read_socket(stream, &mut buffer).await.unwrap()) {
+            Ok(request) => request.challenge,
+            Err(response) => {
+                stream
+                    .write_all(&bson::to_vec(&response).unwrap())
+                    .await
+                    .unwrap();
+                return AuthenticationStatus::NotAuthenticated;
+            }
+        };
 
     let scram_server = scram_server.handle_client_final(&client_final).unwrap();
 
