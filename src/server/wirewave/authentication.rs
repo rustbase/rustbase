@@ -2,8 +2,7 @@ use scram::{AuthenticationProvider, AuthenticationStatus, PasswordInfo, ScramSer
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
 
-use tokio::io::AsyncWriteExt;
-use tokio::net::TcpStream;
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use super::server;
 
@@ -61,10 +60,13 @@ fn process_authentication_request(buffer: &[u8]) -> Result<AuthRequest, Response
 }
 
 #[allow(clippy::unused_io_amount)]
-pub async fn authentication_challenge(
+pub async fn authentication_challenge<IO>(
     scram_server: ScramServer<DefaultAuthenticationProvider>,
-    stream: &mut TcpStream,
-) -> AuthenticationStatus {
+    stream: &mut IO,
+) -> AuthenticationStatus
+where
+    IO: AsyncWrite + AsyncRead + Unpin,
+{
     let mut buffer = vec![0; 1028];
 
     let client_first =

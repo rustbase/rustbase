@@ -130,11 +130,25 @@ impl<T: Wirewave> Server<T> {
 
             let svc = self.svc.clone();
 
+            let server = ScramServer::new(self.auth_provider.clone());
+
             let acceptor = acceptor.clone();
             tokio::spawn(async move {
-                let stream = acceptor.accept(stream).await.unwrap();
+                let mut stream = acceptor.accept(stream).await.unwrap();
 
                 println!("[Wirewave] incoming connection: {}", addr);
+
+                if self.require_authentication {
+                    let status = authentication_challenge(server, &mut stream).await;
+
+                    if status != AuthenticationStatus::Authenticated {
+                        println!("[Wirewave] authentication failed: {:?}", status);
+                        stream.shutdown().await.unwrap();
+
+                        return;
+                    }
+                }
+
                 handle_connection(stream, move |request| {
                     let svc = svc.clone();
                     async move { svc.inner.0.request(request).await }
