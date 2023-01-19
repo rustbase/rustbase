@@ -1,19 +1,26 @@
-use crate::config::schema::Tls;
-use crate::server::auth::check_auth;
-
 use async_trait::async_trait;
-use rustls_pemfile::{certs, pkcs8_private_keys};
 use serde::{Deserialize, Serialize};
+
 use std::fs::File;
+use std::future::Future;
 use std::io::{self, BufReader};
-use std::{future::Future, sync::Arc};
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::{TcpListener, TcpStream, ToSocketAddrs},
-};
+use std::sync::{Arc, RwLock};
+
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::net::{TcpListener, ToSocketAddrs};
+
+use rustls_pemfile::{certs, pkcs8_private_keys};
 use tokio_rustls::rustls::{self, Certificate, PrivateKey};
-use tokio_rustls::server::TlsStream;
 use tokio_rustls::TlsAcceptor;
+
+use scram::{AuthenticationStatus, ScramServer};
+
+use super::authentication;
+use crate::config;
+
+use authentication::authentication_challenge;
+
+use config::schema::Tls;
 
 fn load_certs(path: &String) -> io::Result<Vec<Certificate>> {
     certs(&mut BufReader::new(File::open(path)?))
@@ -49,23 +56,51 @@ struct _Inner<T>(Arc<T>);
 
 pub struct Server<T: Wirewave> {
     svc: WirewaveServer<T>,
+    auth_provider: authentication::DefaultAuthenticationProvider,
+    require_authentication: bool,
 }
 
 impl<T: Wirewave> Server<T> {
-    pub fn new(svc: WirewaveServer<T>) -> Self {
-        Self { svc }
+    pub fn new(
+        svc: WirewaveServer<T>,
+        system_db: Arc<RwLock<dustdata::DustData>>,
+        require_authentication: bool,
+    ) -> Self {
+        let auth_provider = authentication::DefaultAuthenticationProvider {
+            dustdata: system_db,
+        };
+
+        Self {
+            svc,
+            auth_provider,
+            require_authentication,
+        }
     }
 
     pub async fn serve<A: ToSocketAddrs>(self, addr: A) {
         let listener = TcpListener::bind(addr).await.unwrap();
 
         loop {
-            let (stream, addr) = listener.accept().await.unwrap();
+            let (mut stream, addr) = listener.accept().await.unwrap();
 
             let svc = self.svc.clone();
 
+            let server = ScramServer::new(self.auth_provider.clone());
+
             tokio::spawn(async move {
                 println!("[Wirewave] incoming connection: {}", addr);
+
+                if self.require_authentication {
+                    let status = authentication_challenge(server, &mut stream).await;
+
+                    if status != AuthenticationStatus::Authenticated {
+                        println!("[Wirewave] authentication failed: {:?}", status);
+                        stream.shutdown().await.unwrap();
+
+                        return;
+                    }
+                }
+
                 handle_connection(stream, move |request| {
                     let svc = svc.clone();
                     async move { svc.inner.0.request(request).await }
@@ -95,12 +130,26 @@ impl<T: Wirewave> Server<T> {
 
             let svc = self.svc.clone();
 
+            let server = ScramServer::new(self.auth_provider.clone());
+
             let acceptor = acceptor.clone();
             tokio::spawn(async move {
-                let stream = acceptor.accept(stream).await.unwrap();
+                let mut stream = acceptor.accept(stream).await.unwrap();
 
                 println!("[Wirewave] incoming connection: {}", addr);
-                handle_connection_tls(stream, move |request| {
+
+                if self.require_authentication {
+                    let status = authentication_challenge(server, &mut stream).await;
+
+                    if status != AuthenticationStatus::Authenticated {
+                        println!("[Wirewave] authentication failed: {:?}", status);
+                        stream.shutdown().await.unwrap();
+
+                        return;
+                    }
+                }
+
+                handle_connection(stream, move |request| {
                     let svc = svc.clone();
                     async move { svc.inner.0.request(request).await }
                 })
@@ -127,7 +176,7 @@ impl<T: Wirewave> Clone for _Inner<T> {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Request {
     pub auth: Option<String>,
-    pub body: bson::Bson,
+    pub body: bson::Document,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -152,7 +201,7 @@ pub enum Status {
 }
 
 // if is ok, return request else return response and send to client
-pub fn process_request(buf: &[u8]) -> Result<Request, Response> {
+fn process_request(buf: &[u8]) -> Result<Request, Response> {
     let request: Request = match bson::from_slice(buf) {
         Ok(request) => request,
         Err(e) => {
@@ -166,105 +215,62 @@ pub fn process_request(buf: &[u8]) -> Result<Request, Response> {
         }
     };
 
-    if let Some(is_auth) = check_auth(request.clone()) {
-        if !is_auth {
-            let response = Response {
-                message: None,
-                status: Status::InvalidAuth,
-                body: None,
-            };
-
-            return Err(response);
-        }
-    }
-
     Ok(request)
 }
 
-pub async fn handle_connection<F, Fut>(mut socket: TcpStream, callback: F)
+pub async fn read_socket<IO>(socket: &mut IO, buffer: &mut [u8]) -> io::Result<Vec<u8>>
 where
-    F: Fn(Request) -> Fut,
-    Fut: Future<Output = Result<Response, Status>>,
+    IO: AsyncRead + AsyncWrite + Unpin,
 {
-    let mut buf = [0; BUFFER_SIZE];
+    let mut request_bytes = Vec::new();
 
-    loop {
-        match socket.read(&mut buf).await {
-            Err(e) => {
-                eprintln!("[Wirewave] failed to read from socket; {:?}", e);
-            }
+    while let Ok(n) = socket.read(buffer).await {
+        if n == 0 {
+            break;
+        }
 
-            Ok(0) => {
-                println!("[Wirewave] connection closed");
-                break;
-            }
+        request_bytes.extend_from_slice(&buffer[..n]);
 
-            Ok(n) => match process_request(&buf[..n]) {
-                Ok(request) => {
-                    let response = match callback(request).await {
-                        Ok(response) => response,
-                        Err(status) => Response {
-                            message: None,
-                            status,
-                            body: None,
-                        },
-                    };
-
-                    let response = bson::to_bson(&response).unwrap();
-                    let response = bson::to_vec(&response).unwrap();
-
-                    socket.write_all(&response).await.unwrap();
-                }
-                Err(response) => {
-                    let response = bson::to_vec(&response).unwrap();
-
-                    socket.write_all(&response).await.unwrap();
-                }
-            },
-        };
+        if n < BUFFER_SIZE {
+            break;
+        }
     }
+
+    Ok(request_bytes)
 }
 
-pub async fn handle_connection_tls<F, Fut>(mut socket: TlsStream<TcpStream>, callback: F)
+async fn handle_connection<F, Fut, IO>(mut socket: IO, callback: F)
 where
     F: Fn(Request) -> Fut,
     Fut: Future<Output = Result<Response, Status>>,
+    IO: AsyncRead + AsyncWrite + Unpin,
 {
-    let mut buf = [0; BUFFER_SIZE];
+    let mut buffer = vec![0; BUFFER_SIZE];
 
     loop {
-        match socket.read(&mut buf).await {
-            Err(e) => {
-                eprintln!("[Wirewave] failed to read from socket; {:?}", e);
+        let request_bytes = read_socket(&mut socket, &mut buffer).await.unwrap();
+
+        match process_request(&request_bytes[..]) {
+            Ok(request) => {
+                let response = match callback(request).await {
+                    Ok(response) => response,
+                    Err(status) => Response {
+                        message: None,
+                        status,
+                        body: None,
+                    },
+                };
+
+                let response = bson::to_bson(&response).unwrap();
+                let response = bson::to_vec(&response).unwrap();
+
+                socket.write_all(&response).await.ok();
             }
+            Err(response) => {
+                let response = bson::to_vec(&response).unwrap();
 
-            Ok(0) => {
-                println!("[Wirewave] connection closed");
-                break;
+                socket.write_all(&response).await.ok();
             }
-
-            Ok(n) => match process_request(&buf[..n]) {
-                Ok(request) => {
-                    let response = match callback(request).await {
-                        Ok(response) => response,
-                        Err(status) => Response {
-                            message: None,
-                            status,
-                            body: None,
-                        },
-                    };
-
-                    let response = bson::to_bson(&response).unwrap();
-                    let response = bson::to_vec(&response).unwrap();
-
-                    socket.write_all(&response).await.unwrap();
-                }
-                Err(response) => {
-                    let response = bson::to_vec(&response).unwrap();
-
-                    socket.write_all(&response).await.unwrap();
-                }
-            },
-        };
+        }
     }
 }

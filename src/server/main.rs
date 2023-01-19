@@ -2,8 +2,10 @@ use async_trait::async_trait;
 use colored::Colorize;
 use dustdata::{DustData, DustDataConfig, LsmConfig, Size};
 use rayon::{ThreadPool, ThreadPoolBuilder};
+
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::path::Path;
+use std::sync::{Arc, RwLock};
 
 use super::cache;
 use super::engine;
@@ -20,9 +22,10 @@ use wirewave::server::{Request, Response, Server, Status, Wirewave, WirewaveServ
 
 pub struct Database {
     pool: ThreadPool,
-    routers: Arc<Mutex<HashMap<String, DustData>>>,
+    routers: Arc<RwLock<HashMap<String, DustData>>>,
     config: Arc<schema::RustbaseConfig>,
-    cache: Arc<Mutex<Cache>>,
+    cache: Arc<RwLock<Cache>>,
+    system_db: Arc<RwLock<dustdata::DustData>>,
 }
 
 #[async_trait]
@@ -30,20 +33,13 @@ impl Wirewave for Database {
     async fn request(&self, request: Request) -> Result<Response, Status> {
         let body = request.body;
 
-        let body = match body.as_document() {
-            None => return Err(Status::InvalidBody),
-            Some(body) => {
-                if body.is_empty() {
-                    return Err(Status::InvalidBody);
-                }
+        if body.is_empty() {
+            return Err(Status::InvalidBody);
+        }
 
-                if !body.contains_key("query") || !body.contains_key("database") {
-                    return Err(Status::InvalidBody);
-                }
-
-                body
-            }
-        };
+        if !body.contains_key("query") || !body.contains_key("database") {
+            return Err(Status::InvalidBody);
+        }
 
         let database = body.get_str("database").unwrap();
         let query = body.get_str("query").unwrap();
@@ -61,6 +57,7 @@ impl Wirewave for Database {
                         self.cache.clone(),
                         self.routers.clone(),
                         self.config.clone(),
+                        self.system_db.clone(),
                         database.to_string(),
                     );
 
@@ -70,17 +67,25 @@ impl Wirewave for Database {
     }
 }
 
+fn current_users(system_db: Arc<RwLock<DustData>>) -> usize {
+    let dd = system_db.read().unwrap();
+
+    dd.list_keys().unwrap().len()
+}
+
 pub async fn initalize_server(config: schema::RustbaseConfig) {
     let config = Arc::new(config);
     let addr = format!("{}:{}", config.net.host, config.net.port);
 
-    let routers = route::initialize_dustdata(Arc::clone(&config).database.path.clone());
-    let cache = Arc::new(Mutex::new(Cache::new(config.database.cache_size)));
+    let path = Path::new(&config.database.path);
+
+    let routers = route::initialize_dustdata(path);
+    let cache = Arc::new(RwLock::new(Cache::new(config.database.cache_size)));
 
     let c_routers = routers.clone();
     ctrlc::set_handler(move || {
         c_routers
-            .lock()
+            .write()
             .unwrap()
             .iter_mut()
             .for_each(|(route, dd)| {
@@ -96,12 +101,21 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
         .build()
         .unwrap();
 
+    let system_db = Arc::new(RwLock::new(DustData::new(default_dustdata_config(
+        &path.join("_default"),
+    ))));
+
     let database = Database {
         pool,
         routers,
-        config: Arc::clone(&config),
         cache,
+        config: Arc::clone(&config),
+        system_db: Arc::clone(&system_db),
     };
+
+    let users = current_users(Arc::clone(&system_db));
+
+    let use_auth = users > 0;
 
     let svc = WirewaveServer::new(database);
 
@@ -110,19 +124,19 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
         format!("rustbase://{}", addr).yellow()
     );
 
+    let server = Server::new(svc, system_db, use_auth);
+
     if let Some(tls) = &config.tls {
-        Server::new(svc).serve_tls(addr, tls).await;
+        server.serve_tls(addr, tls).await;
     } else {
-        Server::new(svc).serve(addr).await;
+        server.serve(addr).await;
     }
 }
 
-pub fn default_dustdata_config(data_path: String) -> DustDataConfig {
+pub fn default_dustdata_config(data_path: &Path) -> DustDataConfig {
     DustDataConfig {
-        path: data_path,
-        verbose: true,
+        path: data_path.to_str().unwrap().to_string(),
         lsm_config: LsmConfig {
-            detect_exit_signals: false,
             flush_threshold: Size::Megabytes(256),
         },
     }

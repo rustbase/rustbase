@@ -297,14 +297,13 @@ dependencies = [
 
 [[package]]
 name = "dustdata"
-version = "1.1.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eea6dddca08e04632e0a994277ba9d982aae059f1048611f1c00d471716c17ce"
+checksum = "765c873aa9c0ca4f15f5c49315e9a2b41bce21cead2f5049b96ebfb34c87e834"
 dependencies = [
  "bitvec",
  "bson",
  "chrono",
- "ctrlc",
  "farmhash",
  "hex",
  "lz4",
@@ -517,15 +516,6 @@ dependencies = [
  "cfg-if",
  "libc",
  "static_assertions",
-]
-
-[[package]]
-name = "ntapi"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c28774a7fd2fbb4f0babd8237ce554b73af68021b5f695a3cebd6c59bac0980f"
-dependencies = [
- "winapi",
 ]
 
 [[package]]
@@ -776,13 +766,11 @@ name = "rustbase"
 version = "0.3.0"
 dependencies = [
  "async-trait",
- "base64",
  "bson",
  "chrono",
  "colored",
  "ctrlc",
  "dustdata",
- "hex",
  "num_cpus",
  "path-absolutize",
  "pest",
@@ -792,9 +780,9 @@ dependencies = [
  "rayon",
  "rustls",
  "rustls-pemfile",
+ "scram",
  "serde",
  "serde_json",
- "sysinfo",
  "tokio",
  "tokio-rustls",
  "winres",
@@ -832,6 +820,17 @@ name = "scopeguard"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
+
+[[package]]
+name = "scram"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7679a5e6b97bac99b2c208894ba0d34b17d9657f0b728c1cd3bf1c5f7f6ebe88"
+dependencies = [
+ "base64",
+ "rand",
+ "ring",
+]
 
 [[package]]
 name = "scratch"
@@ -947,21 +946,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
-]
-
-[[package]]
-name = "sysinfo"
-version = "0.23.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3977ec2e0520829be45c8a2df70db2bf364714d8a748316a10c3c35d4d2b01c9"
-dependencies = [
- "cfg-if",
- "core-foundation-sys",
- "libc",
- "ntapi",
- "once_cell",
- "rayon",
- "winapi",
 ]
 
 [[package]]
