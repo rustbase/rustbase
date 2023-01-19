@@ -365,7 +365,18 @@ impl Core {
     }
 
     fn update_dustdata(&mut self, key: String, value: Bson) -> Result<(), TransactionError> {
-        let mut routers = self.routers.lock().unwrap();
+        if self.current_database == "_default" {
+            return Err(TransactionError::ExternalError(
+                Status::Error,
+                "database.reserved".to_string(),
+            ));
+        }
+
+        let mut cache = self.cache.write().unwrap();
+        let cache_key = format!("{}:{}", self.current_database, key);
+        cache.remove(&cache_key).ok();
+
+        let mut routers = self.routers.write().unwrap();
         let dd = routers.get_mut(&self.current_database);
 
         if let Some(dd) = dd {
@@ -387,7 +398,7 @@ impl Core {
             ));
         }
 
-        let mut cache = self.cache.lock().unwrap();
+        let mut cache = self.cache.write().unwrap();
         let cache_key = format!("{}:{}", self.current_database, key);
         cache.remove(&cache_key).ok();
 
