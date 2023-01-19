@@ -92,9 +92,6 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
                 println!("[Server] flushing {} to exit", route.yellow());
                 dd.flush().unwrap();
             });
-
-        println!("[Server] flushing _default database to exit");
-
         std::process::exit(0);
     })
     .expect("Error setting Ctrl-C handler");
