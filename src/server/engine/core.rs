@@ -209,6 +209,10 @@ impl Core {
                         }
                     }
 
+                    if username.is_empty() || password.is_empty() {
+                        return Err(Status::SyntaxError);
+                    }
+
                     match self.create_user(username, password) {
                         Ok(_) => Ok(Response {
                             message: None,
