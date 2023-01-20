@@ -82,7 +82,12 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
     let routers = route::initialize_dustdata(path);
     let cache = Arc::new(RwLock::new(Cache::new(config.database.cache_size)));
 
+    let system_db = Arc::new(RwLock::new(DustData::new(default_dustdata_config(
+        &path.join("_default"),
+    ))));
+
     let c_routers = routers.clone();
+    let c_system_db = system_db.clone();
     ctrlc::set_handler(move || {
         c_routers
             .write()
@@ -92,6 +97,9 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
                 println!("[Server] flushing {} to exit", route.yellow());
                 dd.flush().unwrap();
             });
+
+        c_system_db.write().unwrap().flush().unwrap();
+
         std::process::exit(0);
     })
     .expect("Error setting Ctrl-C handler");
@@ -100,10 +108,6 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
         .num_threads(config.database.threads)
         .build()
         .unwrap();
-
-    let system_db = Arc::new(RwLock::new(DustData::new(default_dustdata_config(
-        &path.join("_default"),
-    ))));
 
     let database = Database {
         pool,

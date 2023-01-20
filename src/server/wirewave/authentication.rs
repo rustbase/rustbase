@@ -43,12 +43,12 @@ struct AuthRequest {
 }
 
 fn process_authentication_request(buffer: &[u8]) -> Result<AuthRequest, Response> {
-    let request: AuthRequest = match bson::from_slice(buffer) {
+    let challenge: String = match String::from_utf8(buffer.to_vec()) {
         Ok(request) => request,
         Err(e) => {
             let response = Response {
                 message: Some(e.to_string()),
-                status: Status::InvalidBson,
+                status: Status::Error,
                 body: None,
             };
 
@@ -56,7 +56,7 @@ fn process_authentication_request(buffer: &[u8]) -> Result<AuthRequest, Response
         }
     };
 
-    Ok(request)
+    Ok(AuthRequest { challenge })
 }
 
 #[allow(clippy::unused_io_amount)]
