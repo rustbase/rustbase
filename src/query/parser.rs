@@ -111,6 +111,7 @@ fn build_expr(pair: Pair<Rule>) -> Result<ASTNode> {
                 keyword: match keyword.as_str() {
                     "insert" => Keywords::Insert,
                     "delete" => Keywords::Delete,
+                    "update" => Keywords::Update,
                     _ => {
                         return Err(QueryError(
                             QueryErrorType::SyntaxError,

@@ -203,7 +203,6 @@ impl Core {
                             }
 
                             _ => {
-                                println!("{:?}", node);
                                 unreachable!()
                             }
                         }
@@ -273,6 +272,60 @@ impl Core {
                         Err(e) => self.dd_error(e),
                     }
                 }
+            },
+
+            Keywords::Update => match verb {
+                Verbs::User => {
+                    if expr.is_none() {
+                        return Err(Status::SyntaxError);
+                    }
+
+                    let mut password = String::new();
+                    let mut username = String::new();
+
+                    for node in expr.unwrap() {
+                        match node {
+                            // this will find the password
+                            ASTNode::AssignmentExpression { ident, value } => {
+                                if ident.as_str() == "password" {
+                                    password = match *value {
+                                        ASTNode::Bson(s) => {
+                                            let s = s.as_str();
+
+                                            // if the password is not a string, return an error
+                                            if let Some(s) = s {
+                                                s.to_string()
+                                            } else {
+                                                return Err(Status::SyntaxError);
+                                            }
+                                        }
+                                        _ => {
+                                            unreachable!()
+                                        }
+                                    }
+                                }
+                            }
+
+                            ASTNode::Identifier(ref ident) => username = ident.clone(),
+
+                            _ => {
+                                unreachable!()
+                            }
+                        }
+                    }
+
+                    match self.update_user(username, password) {
+                        Ok(_) => Ok(Response {
+                            message: None,
+                            status: Status::Ok,
+                            body: None,
+                        }),
+
+                        Err(e) => self.dd_error(e),
+                    }
+                }
+
+                _ => Err(Status::SyntaxError),
             },
 
             _ => Err(Status::SyntaxError),
@@ -540,6 +593,33 @@ impl Core {
 
         dd.delete(&username)
             .map_err(TransactionError::InternalError)
+    }
+
+    fn update_user(&mut self, username: String, password: String) -> Result<(), TransactionError> {
+        let mut dd = self.system_db.write().unwrap();
+
+        let salt = rand::thread_rng().gen::<[u8; 32]>().to_vec();
+        let hash_password =
+            hash_password(&password, std::num::NonZeroU32::new(4096).unwrap(), &salt).to_vec();
+
+        let hash_password = bson::Binary {
+            subtype: bson::spec::BinarySubtype::Generic,
+            bytes: hash_password,
+        };
+
+        let salt = bson::Binary {
+            subtype: bson::spec::BinarySubtype::Generic,
+            bytes: salt,
+        };
+
+        dd.update(
+            &username,
+            Bson::Document(bson::doc! {
+                "password": hash_password,
+                "salt": salt,
+            }),
+        )
+        .map_err(TransactionError::InternalError)
     }
 
     // error
