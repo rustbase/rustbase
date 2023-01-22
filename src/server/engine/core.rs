@@ -2,7 +2,7 @@ use bson::Bson;
 use dustdata::DustData;
 use dustdata::Error as DustDataError;
 use rand::Rng;
-use scram::hash_password;
+use rustbase_scram::hash_password;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
@@ -18,6 +18,7 @@ use server::wirewave;
 
 use cache::Cache;
 use query::parser::{ASTNode, Keywords, Verbs};
+use wirewave::authorization::UserPermission;
 use wirewave::server::{Response, Status};
 
 pub struct Core {
@@ -26,6 +27,7 @@ pub struct Core {
     config: Arc<schema::RustbaseConfig>,
     current_database: String,
     system_db: Arc<RwLock<DustData>>,
+    current_user: Option<String>,
 }
 
 enum TransactionError {
@@ -40,6 +42,7 @@ impl Core {
         config: Arc<schema::RustbaseConfig>,
         system_db: Arc<RwLock<DustData>>,
         current_database: String,
+        current_user: Option<String>,
     ) -> Self {
         Self {
             cache,
@@ -47,6 +50,7 @@ impl Core {
             config,
             current_database,
             system_db,
+            current_user,
         }
     }
 
@@ -147,50 +151,80 @@ impl Core {
 
                     let expr = expr.unwrap();
 
-                    if expr.len() != 2 {
-                        return Err(Status::SyntaxError);
-                    }
-
                     let mut username = String::new();
+                    let mut permission = String::new();
                     let mut password = String::new();
 
                     // idk if this is the best way to do this
                     for node in expr {
                         match node {
-                            // this will find the password
+                            // this will find the password and permission
                             ASTNode::AssignmentExpression { ident, value } => {
-                                if ident.as_str() == "password" {
-                                    password = match *value {
-                                        ASTNode::Bson(s) => {
-                                            let s = s.as_str();
+                                match ident.as_str() {
+                                    "password" => {
+                                        password = match *value {
+                                            ASTNode::Bson(s) => {
+                                                let s = s.as_str();
 
-                                            // if the password is not a string, return an error
-                                            if let Some(s) = s {
-                                                s.to_string()
-                                            } else {
-                                                return Err(Status::SyntaxError);
+                                                // if the password is not a string, return an error
+                                                if let Some(s) = s {
+                                                    s.to_string()
+                                                } else {
+                                                    return syntax_error(
+                                                        "password must be a string",
+                                                    );
+                                                }
+                                            }
+
+                                            _ => {
+                                                return syntax_error("password must be a string");
                                             }
                                         }
-                                        _ => {
-                                            unreachable!()
+                                    }
+
+                                    "permission" => {
+                                        permission = match *value {
+                                            ASTNode::Bson(s) => {
+                                                let s = s.as_str();
+
+                                                // if the permission is not a string, return an error
+                                                if let Some(s) = s {
+                                                    s.to_string()
+                                                } else {
+                                                    return syntax_error(
+                                                        "permission must be a string",
+                                                    );
+                                                }
+                                            }
+                                            _ => {
+                                                return syntax_error("permission must be a string");
+                                            }
                                         }
                                     }
+
+                                    _ => {}
                                 }
                             }
 
                             ASTNode::Identifier(ref ident) => username = ident.clone(),
 
-                            _ => {
-                                unreachable!()
-                            }
+                            _ => {}
                         }
                     }
 
-                    if username.is_empty() || password.is_empty() {
-                        return Err(Status::SyntaxError);
+                    if username.is_empty() || password.is_empty() || permission.is_empty() {
+                        return syntax_error("username, password, and permission are required");
                     }
 
-                    match self.create_user(username, password) {
+                    let permission = UserPermission::from_str(permission.as_str());
+
+                    if permission.is_none() {
+                        return syntax_error(
+                            "permission must be 'read' or 'write', 'read_and_write', or 'admin'",
+                        );
+                    }
+
+                    match self.create_user(username, password, permission.unwrap()) {
                         Ok(_) => Ok(Response {
                             message: None,
                             status: Status::Ok,
@@ -258,41 +292,68 @@ impl Core {
                         return Err(Status::SyntaxError);
                     }
 
-                    let mut password = String::new();
+                    let mut password: Option<String> = None;
+                    let mut permission: Option<String> = None;
                     let mut username = String::new();
 
                     for node in expr.unwrap() {
                         match node {
-                            // this will find the password
+                            // this will find the password and permission
                             ASTNode::AssignmentExpression { ident, value } => {
-                                if ident.as_str() == "password" {
-                                    password = match *value {
-                                        ASTNode::Bson(s) => {
-                                            let s = s.as_str();
+                                match ident.as_str() {
+                                    "password" => {
+                                        password = match *value {
+                                            ASTNode::Bson(s) => {
+                                                let s = s.as_str();
 
-                                            // if the password is not a string, return an error
-                                            if let Some(s) = s {
-                                                s.to_string()
-                                            } else {
-                                                return Err(Status::SyntaxError);
+                                                // if the password is not a string, return an error
+                                                if let Some(s) = s {
+                                                    Some(s.to_string())
+                                                } else {
+                                                    return syntax_error(
+                                                        "password must be a string",
+                                                    );
+                                                }
                                             }
-                                        }
-                                        _ => {
-                                            unreachable!()
+                                            _ => None,
                                         }
                                     }
+
+                                    "permission" => {
+                                        permission = match *value {
+                                            ASTNode::Bson(s) => {
+                                                let s = s.as_str();
+
+                                                // if the password is not a string, return an error
+                                                if let Some(s) = s {
+                                                    Some(s.to_string())
+                                                } else {
+                                                    return syntax_error(
+                                                        "permission must be a string",
+                                                    );
+                                                }
+                                            }
+                                            _ => None,
+                                        }
+                                    }
+
+                                    _ => {}
                                 }
                             }
 
                             ASTNode::Identifier(ref ident) => username = ident.clone(),
 
-                            _ => {
-                                unreachable!()
-                            }
+                            _ => {}
                         }
                     }
 
-                    match self.update_user(username, password) {
+                    let permission: Option<UserPermission> = if let Some(permission) = permission {
+                        UserPermission::from_str(permission.as_str())
+                    } else {
+                        None
+                    };
+
+                    match self.update_user(username, password, permission) {
                         Ok(_) => Ok(Response {
                             message: None,
                             status: Status::Ok,
@@ -382,6 +443,15 @@ impl Core {
             ));
         }
 
+        if let Some(current_user) = &self.current_user {
+            if !self.user_has_perm(current_user.clone(), UserPermission::Write)? {
+                return Err(TransactionError::ExternalError(
+                    Status::Error,
+                    "permission.denied".to_string(),
+                ));
+            }
+        }
+
         let mut routers = self.routers.write().unwrap();
 
         if !routers.contains_key(&self.current_database) {
@@ -405,6 +475,15 @@ impl Core {
                 Status::Error,
                 "database.reserved".to_string(),
             ));
+        }
+
+        if let Some(current_user) = &self.current_user {
+            if !self.user_has_perm(current_user.clone(), UserPermission::Write)? {
+                return Err(TransactionError::ExternalError(
+                    Status::Error,
+                    "permission.denied".to_string(),
+                ));
+            }
         }
 
         let mut cache = self.cache.write().unwrap();
@@ -433,6 +512,15 @@ impl Core {
             ));
         }
 
+        if let Some(current_user) = &self.current_user {
+            if !self.user_has_perm(current_user.clone(), UserPermission::Write)? {
+                return Err(TransactionError::ExternalError(
+                    Status::Error,
+                    "permission.denied".to_string(),
+                ));
+            }
+        }
+
         let mut cache = self.cache.write().unwrap();
         let cache_key = format!("{}:{}", self.current_database, key);
         cache.remove(&cache_key).ok();
@@ -458,6 +546,15 @@ impl Core {
             ));
         }
 
+        if let Some(current_user) = &self.current_user {
+            if !self.user_has_perm(current_user.clone(), UserPermission::Read)? {
+                return Err(TransactionError::ExternalError(
+                    Status::Error,
+                    "permission.denied".to_string(),
+                ));
+            }
+        }
+
         let mut cache = self.cache.write().unwrap();
 
         let cache_key = format!("{}:{}", self.current_database, key);
@@ -466,8 +563,8 @@ impl Core {
             return Ok(bson.clone());
         }
 
-        let mut routers = self.routers.write().unwrap();
-        let dd = routers.get_mut(&self.current_database);
+        let routers = self.routers.read().unwrap();
+        let dd = routers.get(&self.current_database);
 
         if let Some(dd) = dd {
             let value = dd.get(&key).map_err(TransactionError::InternalError)?;
@@ -498,8 +595,17 @@ impl Core {
             ));
         }
 
-        let mut routers = self.routers.write().unwrap();
-        let dd = routers.get_mut(&self.current_database).unwrap();
+        if let Some(current_user) = &self.current_user {
+            if !self.user_has_perm(current_user.clone(), UserPermission::Read)? {
+                return Err(TransactionError::ExternalError(
+                    Status::Error,
+                    "permission.denied".to_string(),
+                ));
+            }
+        }
+
+        let routers = self.routers.read().unwrap();
+        let dd = routers.get(&self.current_database).unwrap();
 
         dd.list_keys().map_err(TransactionError::InternalError)
     }
@@ -510,6 +616,15 @@ impl Core {
                 Status::Error,
                 "database.reserved".to_string(),
             ));
+        }
+
+        if let Some(current_user) = &self.current_user {
+            if !self.user_has_perm(current_user.clone(), UserPermission::Admin)? {
+                return Err(TransactionError::ExternalError(
+                    Status::Error,
+                    "permission.denied".to_string(),
+                ));
+            }
         }
 
         let mut routers = self.routers.write().unwrap();
@@ -539,7 +654,21 @@ impl Core {
     }
 
     // auth interface
-    fn create_user(&mut self, username: String, password: String) -> Result<(), TransactionError> {
+    fn create_user(
+        &mut self,
+        username: String,
+        password: String,
+        user_permission: UserPermission,
+    ) -> Result<(), TransactionError> {
+        if let Some(current_user) = &self.current_user {
+            if !self.user_has_perm(current_user.clone(), UserPermission::Admin)? {
+                return Err(TransactionError::ExternalError(
+                    Status::Error,
+                    "permission.denied".to_string(),
+                ));
+            }
+        }
+
         let mut dd = self.system_db.write().unwrap();
 
         let salt = rand::thread_rng().gen::<[u8; 32]>().to_vec();
@@ -556,48 +685,119 @@ impl Core {
             bytes: salt,
         };
 
-        dd.insert(
-            &username,
-            Bson::Document(bson::doc! {
-                "password": hash_password,
-                "salt": salt,
-            }),
-        )
-        .map_err(TransactionError::InternalError)
+        let doc = bson::doc! {
+            "password": hash_password,
+            "salt": salt,
+            "permission": user_permission as i32,
+        };
+
+        dd.insert(&username, Bson::Document(doc))
+            .map_err(TransactionError::InternalError)
     }
 
     fn delete_user(&mut self, username: String) -> Result<(), TransactionError> {
+        if let Some(current_user) = &self.current_user {
+            if !self.user_has_perm(current_user.clone(), UserPermission::Admin)? {
+                return Err(TransactionError::ExternalError(
+                    Status::Error,
+                    "permission.denied".to_string(),
+                ));
+            }
+        }
+
         let mut dd = self.system_db.write().unwrap();
 
         dd.delete(&username)
             .map_err(TransactionError::InternalError)
     }
 
-    fn update_user(&mut self, username: String, password: String) -> Result<(), TransactionError> {
+    fn update_user(
+        &mut self,
+        username: String,
+        password: Option<String>,
+        user_permission: Option<UserPermission>,
+    ) -> Result<(), TransactionError> {
+        if let Some(current_user) = &self.current_user {
+            if !self.user_has_perm(current_user.clone(), UserPermission::Admin)? {
+                return Err(TransactionError::ExternalError(
+                    Status::Error,
+                    "permission.denied".to_string(),
+                ));
+            }
+        }
+
         let mut dd = self.system_db.write().unwrap();
 
-        let salt = rand::thread_rng().gen::<[u8; 32]>().to_vec();
-        let hash_password =
-            hash_password(&password, std::num::NonZeroU32::new(4096).unwrap(), &salt).to_vec();
+        let user = dd.get(&username).map_err(TransactionError::InternalError)?;
 
-        let hash_password = bson::Binary {
-            subtype: bson::spec::BinarySubtype::Generic,
-            bytes: hash_password,
-        };
+        if user.is_none() {
+            return Err(TransactionError::ExternalError(
+                Status::Error,
+                "user.notFound".to_string(),
+            ));
+        }
 
-        let salt = bson::Binary {
-            subtype: bson::spec::BinarySubtype::Generic,
-            bytes: salt,
-        };
+        let mut user = user.unwrap();
+        let user = user.as_document_mut().unwrap();
 
-        dd.update(
-            &username,
-            Bson::Document(bson::doc! {
+        if let Some(password) = password {
+            let salt = rand::thread_rng().gen::<[u8; 32]>().to_vec();
+            let hash_password =
+                hash_password(&password, std::num::NonZeroU32::new(4096).unwrap(), &salt).to_vec();
+
+            let hash_password = bson::Binary {
+                subtype: bson::spec::BinarySubtype::Generic,
+                bytes: hash_password,
+            };
+
+            let salt = bson::Binary {
+                subtype: bson::spec::BinarySubtype::Generic,
+                bytes: salt,
+            };
+
+            let doc = bson::doc! {
                 "password": hash_password,
                 "salt": salt,
-            }),
-        )
-        .map_err(TransactionError::InternalError)
+            };
+
+            user.extend(doc);
+        }
+
+        if let Some(user_permission) = user_permission {
+            user.extend(bson::doc! {
+                "permission": user_permission as i32,
+            });
+        }
+
+        println!("{:?}", user);
+
+        dd.update(&username, bson::to_bson(user).unwrap())
+            .map_err(TransactionError::InternalError)
+    }
+
+    fn user_has_perm(
+        &self,
+        username: String,
+        perm: UserPermission,
+    ) -> Result<bool, TransactionError> {
+        let dd = self.system_db.read().unwrap();
+
+        let user = dd.get(&username).map_err(TransactionError::InternalError)?;
+
+        if user.is_none() {
+            return Err(TransactionError::ExternalError(
+                Status::Error,
+                "user.notFound".to_string(),
+            ));
+        }
+
+        let user = user.unwrap();
+        let user = user.as_document().unwrap();
+
+        let user_permission = user.get("permission").unwrap().as_i32().unwrap();
+        let user_permission = UserPermission::from_i32(user_permission).unwrap();
+
+        Ok(user_permission.cmp(&perm))
     }
 
     // error
@@ -629,4 +829,12 @@ fn parse_dd_error_code(code: dustdata::ErrorCode) -> (Status, String) {
         dustdata::ErrorCode::KeyNotExists => (Status::KeyNotExists, "key.notExists".to_string()),
         dustdata::ErrorCode::NotFound => (Status::Error, "notFound".to_string()),
     }
+}
+
+fn syntax_error(msg: &str) -> Result<Response, Status> {
+    Ok(Response {
+        message: Some(msg.to_string()),
+        status: Status::SyntaxError,
+        body: None,
+    })
 }
