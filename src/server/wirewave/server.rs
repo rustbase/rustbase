@@ -201,14 +201,15 @@ pub struct Response {
 pub enum Status {
     Ok,
     Error,
-    DatabaseNotFound,
-    KeyNotExists,
-    KeyAlreadyExists,
+    NotFound,
+    AlreadyExists,
     SyntaxError,
     InvalidQuery,
     InvalidBody,
     InvalidBson,
     InvalidAuth,
+    NotAuthorized,
+    Reserved,
 }
 
 // if is ok, return request else return response and send to client

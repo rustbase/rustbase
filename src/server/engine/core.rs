@@ -83,16 +83,12 @@ impl Core {
             Keywords::Insert => {
                 let key = match expr {
                     ASTNode::Identifier(ident) => ident,
-                    _ => {
-                        unreachable!()
-                    }
+                    _ => return syntax_error("key must be an identifier"),
                 };
 
                 let value = match value {
                     ASTNode::Bson(json) => json,
-                    _ => {
-                        unreachable!()
-                    }
+                    _ => return syntax_error("value must be a json object"),
                 };
 
                 match self.insert_into_dustdata(key, value) {
@@ -109,16 +105,12 @@ impl Core {
             Keywords::Update => {
                 let key = match expr {
                     ASTNode::Identifier(ident) => ident,
-                    _ => {
-                        unreachable!()
-                    }
+                    _ => return syntax_error("key must be an identifier"),
                 };
 
                 let value = match value {
                     ASTNode::Bson(json) => json,
-                    _ => {
-                        unreachable!()
-                    }
+                    _ => return syntax_error("value must be a json object"),
                 };
 
                 match self.update_dustdata(key, value) {
@@ -132,7 +124,7 @@ impl Core {
                 }
             }
 
-            _ => Err(Status::SyntaxError),
+            _ => Err(Status::InvalidQuery),
         }
     }
 
@@ -146,7 +138,7 @@ impl Core {
             Keywords::Insert => match verb {
                 Verbs::User => {
                     if expr.is_none() {
-                        return Err(Status::SyntaxError);
+                        return Err(Status::InvalidQuery);
                     }
 
                     let expr = expr.unwrap();
@@ -235,7 +227,7 @@ impl Core {
                     }
                 }
 
-                _ => Err(Status::SyntaxError),
+                _ => Err(Status::InvalidQuery),
             },
 
             Keywords::Delete => match verb {
@@ -289,7 +281,7 @@ impl Core {
             Keywords::Update => match verb {
                 Verbs::User => {
                     if expr.is_none() {
-                        return Err(Status::SyntaxError);
+                        return Err(Status::InvalidQuery);
                     }
 
                     let mut password: Option<String> = None;
@@ -364,10 +356,10 @@ impl Core {
                     }
                 }
 
-                _ => Err(Status::SyntaxError),
+                _ => Err(Status::InvalidQuery),
             },
 
-            _ => Err(Status::SyntaxError),
+            _ => Err(Status::InvalidQuery),
         }
     }
 
@@ -379,7 +371,7 @@ impl Core {
         match keyword {
             Keywords::Get => {
                 if ident.is_none() {
-                    return Err(Status::SyntaxError);
+                    return Err(Status::InvalidQuery);
                 }
 
                 let key = match *ident.unwrap() {
@@ -429,7 +421,7 @@ impl Core {
                 Err(e) => self.dd_error(e),
             },
 
-            _ => Err(Status::SyntaxError),
+            _ => Err(Status::InvalidQuery),
         }
     }
 
@@ -438,16 +430,16 @@ impl Core {
     fn insert_into_dustdata(&mut self, key: String, value: Bson) -> Result<(), TransactionError> {
         if self.current_database == "_default" {
             return Err(TransactionError::ExternalError(
-                Status::Error,
-                "database.reserved".to_string(),
+                Status::Reserved,
+                "database reserved".to_string(),
             ));
         }
 
         if let Some(current_user) = &self.current_user {
             if !self.user_has_perm(current_user.clone(), UserPermission::Write)? {
                 return Err(TransactionError::ExternalError(
-                    Status::Error,
-                    "permission.denied".to_string(),
+                    Status::NotAuthorized,
+                    "permission denied".to_string(),
                 ));
             }
         }
@@ -472,16 +464,16 @@ impl Core {
     fn update_dustdata(&mut self, key: String, value: Bson) -> Result<(), TransactionError> {
         if self.current_database == "_default" {
             return Err(TransactionError::ExternalError(
-                Status::Error,
-                "database.reserved".to_string(),
+                Status::Reserved,
+                "database reserved".to_string(),
             ));
         }
 
         if let Some(current_user) = &self.current_user {
             if !self.user_has_perm(current_user.clone(), UserPermission::Write)? {
                 return Err(TransactionError::ExternalError(
-                    Status::Error,
-                    "permission.denied".to_string(),
+                    Status::NotAuthorized,
+                    "permission denied".to_string(),
                 ));
             }
         }
@@ -498,8 +490,8 @@ impl Core {
                 .map_err(TransactionError::InternalError)
         } else {
             Err(TransactionError::ExternalError(
-                Status::DatabaseNotFound,
-                "database.notFound".to_string(),
+                Status::NotFound,
+                "database not found".to_string(),
             ))
         }
     }
@@ -507,16 +499,16 @@ impl Core {
     fn delete_from_dustdata(&mut self, key: String) -> Result<(), TransactionError> {
         if self.current_database == "_default" {
             return Err(TransactionError::ExternalError(
-                Status::Error,
-                "database.reserved".to_string(),
+                Status::Reserved,
+                "database reserved".to_string(),
             ));
         }
 
         if let Some(current_user) = &self.current_user {
             if !self.user_has_perm(current_user.clone(), UserPermission::Write)? {
                 return Err(TransactionError::ExternalError(
-                    Status::Error,
-                    "permission.denied".to_string(),
+                    Status::NotAuthorized,
+                    "permission denied".to_string(),
                 ));
             }
         }
@@ -532,8 +524,8 @@ impl Core {
             dd.delete(&key).map_err(TransactionError::InternalError)
         } else {
             Err(TransactionError::ExternalError(
-                Status::DatabaseNotFound,
-                "database.notFound".to_string(),
+                Status::NotFound,
+                "database not found".to_string(),
             ))
         }
     }
@@ -541,16 +533,16 @@ impl Core {
     fn get_from_dustdata(&mut self, key: String) -> Result<Bson, TransactionError> {
         if self.current_database == "_default" {
             return Err(TransactionError::ExternalError(
-                Status::Error,
-                "database.reserved".to_string(),
+                Status::Reserved,
+                "database reserved".to_string(),
             ));
         }
 
         if let Some(current_user) = &self.current_user {
             if !self.user_has_perm(current_user.clone(), UserPermission::Read)? {
                 return Err(TransactionError::ExternalError(
-                    Status::Error,
-                    "permission.denied".to_string(),
+                    Status::NotAuthorized,
+                    "permission denied".to_string(),
                 ));
             }
         }
@@ -575,14 +567,14 @@ impl Core {
                 Ok(bson)
             } else {
                 Err(TransactionError::ExternalError(
-                    Status::KeyNotExists,
-                    "key.notFound".to_string(),
+                    Status::NotFound,
+                    "key not found".to_string(),
                 ))
             }
         } else {
             Err(TransactionError::ExternalError(
-                Status::DatabaseNotFound,
-                "database.notFound".to_string(),
+                Status::NotFound,
+                "database not found".to_string(),
             ))
         }
     }
@@ -590,16 +582,16 @@ impl Core {
     fn list_from_dustdata(&mut self) -> Result<Vec<String>, TransactionError> {
         if self.current_database == "_default" {
             return Err(TransactionError::ExternalError(
-                Status::Error,
-                "database.reserved".to_string(),
+                Status::Reserved,
+                "database reserved".to_string(),
             ));
         }
 
         if let Some(current_user) = &self.current_user {
             if !self.user_has_perm(current_user.clone(), UserPermission::Read)? {
                 return Err(TransactionError::ExternalError(
-                    Status::Error,
-                    "permission.denied".to_string(),
+                    Status::NotAuthorized,
+                    "permission denied".to_string(),
                 ));
             }
         }
@@ -613,15 +605,15 @@ impl Core {
     fn delete_database(&mut self, database: String) -> Result<(), TransactionError> {
         if self.current_database == "_default" {
             return Err(TransactionError::ExternalError(
-                Status::Error,
-                "database.reserved".to_string(),
+                Status::Reserved,
+                "database reserved".to_string(),
             ));
         }
 
         if let Some(current_user) = &self.current_user {
             if !self.user_has_perm(current_user.clone(), UserPermission::Admin)? {
                 return Err(TransactionError::ExternalError(
-                    Status::Error,
+                    Status::NotAuthorized,
                     "permission.denied".to_string(),
                 ));
             }
@@ -647,8 +639,8 @@ impl Core {
             Ok(())
         } else {
             Err(TransactionError::ExternalError(
-                Status::DatabaseNotFound,
-                "database.notFound".to_string(),
+                Status::NotFound,
+                "database not found".to_string(),
             ))
         }
     }
@@ -699,8 +691,8 @@ impl Core {
         if let Some(current_user) = &self.current_user {
             if !self.user_has_perm(current_user.clone(), UserPermission::Admin)? {
                 return Err(TransactionError::ExternalError(
-                    Status::Error,
-                    "permission.denied".to_string(),
+                    Status::NotAuthorized,
+                    "permission denied".to_string(),
                 ));
             }
         }
@@ -720,8 +712,8 @@ impl Core {
         if let Some(current_user) = &self.current_user {
             if !self.user_has_perm(current_user.clone(), UserPermission::Admin)? {
                 return Err(TransactionError::ExternalError(
-                    Status::Error,
-                    "permission.denied".to_string(),
+                    Status::NotAuthorized,
+                    "permission denied".to_string(),
                 ));
             }
         }
@@ -732,8 +724,8 @@ impl Core {
 
         if user.is_none() {
             return Err(TransactionError::ExternalError(
-                Status::Error,
-                "user.notFound".to_string(),
+                Status::NotFound,
+                "user not found".to_string(),
             ));
         }
 
@@ -769,8 +761,6 @@ impl Core {
             });
         }
 
-        println!("{:?}", user);
-
         dd.update(&username, bson::to_bson(user).unwrap())
             .map_err(TransactionError::InternalError)
     }
@@ -786,8 +776,8 @@ impl Core {
 
         if user.is_none() {
             return Err(TransactionError::ExternalError(
-                Status::Error,
-                "user.notFound".to_string(),
+                Status::NotFound,
+                "user not found".to_string(),
             ));
         }
 
@@ -823,11 +813,9 @@ impl Core {
 
 fn parse_dd_error_code(code: dustdata::ErrorCode) -> (Status, String) {
     match code {
-        dustdata::ErrorCode::KeyExists => {
-            (Status::KeyAlreadyExists, "key.alreadyExists".to_string())
-        }
-        dustdata::ErrorCode::KeyNotExists => (Status::KeyNotExists, "key.notExists".to_string()),
-        dustdata::ErrorCode::NotFound => (Status::Error, "notFound".to_string()),
+        dustdata::ErrorCode::KeyExists => (Status::AlreadyExists, "key already exists".to_string()),
+        dustdata::ErrorCode::KeyNotExists => (Status::AlreadyExists, "key not exists".to_string()),
+        dustdata::ErrorCode::NotFound => (Status::NotFound, "not found".to_string()),
     }
 }
 
