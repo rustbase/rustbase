@@ -67,7 +67,6 @@ jobs:
               with:
                   files: |
                       release/rustbase-windows-x64.zip
-                      release/rustbase-windows-x86.zip
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
@@ -100,7 +99,6 @@ jobs:
               if: startsWith(github.ref, 'refs/tags/')
               with:
                   files: |
-                      release/rustbase-windows-x64.zip
                       release/rustbase-windows-x86.zip
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
