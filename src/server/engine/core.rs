@@ -157,50 +157,28 @@ impl Core {
                     // idk if this is the best way to do this
                     for node in expr {
                         match node {
-                            // this will find the username and password
+                            // this will find the password
                             ASTNode::AssignmentExpression { ident, value } => {
-                                match ident.as_str() {
-                                    // this will find the password
-                                    "username" => {
-                                        username = match *value {
-                                            ASTNode::Bson(s) => {
-                                                let s = s.as_str();
+                                if ident.as_str() == "password" {
+                                    password = match *value {
+                                        ASTNode::Bson(s) => {
+                                            let s = s.as_str();
 
-                                                // if the username is not a string, return an error
-                                                if let Some(s) = s {
-                                                    s.to_string()
-                                                } else {
-                                                    return Err(Status::SyntaxError);
-                                                }
-                                            }
-                                            _ => {
-                                                unreachable!()
+                                            // if the password is not a string, return an error
+                                            if let Some(s) = s {
+                                                s.to_string()
+                                            } else {
+                                                return Err(Status::SyntaxError);
                                             }
                                         }
-                                    }
-
-                                    // this will find the password
-                                    "password" => {
-                                        password = match *value {
-                                            ASTNode::Bson(s) => {
-                                                let s = s.as_str();
-
-                                                // if the username is not a string, return an error
-                                                if let Some(s) = s {
-                                                    s.to_string()
-                                                } else {
-                                                    return Err(Status::SyntaxError);
-                                                }
-                                            }
-                                            _ => {
-                                                unreachable!()
-                                            }
+                                        _ => {
+                                            unreachable!()
                                         }
                                     }
-
-                                    _ => {}
                                 }
                             }
+
+                            ASTNode::Identifier(ref ident) => username = ident.clone(),
 
                             _ => {
                                 unreachable!()
