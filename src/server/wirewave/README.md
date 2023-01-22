@@ -16,11 +16,14 @@ Each response must be a BSON document with the following fields:
 -   `body` - The body of the message. This is a BSON document and can be null.
 -   `error` - The message to send to the client. This is a string and can be null.
 -   `status` - The status of the response. This is a enum with the following values:
-    -   `Ok` - The request was successful.
-    -   `Error` - The request failed.
-    -   `DatabaseNotFound` - The database was not found.
-    -   `KeyNotFound` - The key was not found.
-    -   `KeyAlreadyExists` - The key already exists.
-    -   `SyntaxError` - The syntax of the request was invalid.
-    -   `InvalidRequest` - The request was invalid.
-    -   `InvalidBody` - The body of the request was invalid.
+ - `Ok` - The request was successful.
+ - `Error` - The request failed.
+ - `NotFound` - The requested resource was not found.
+ - `AlreadyExists` - The requested resource already exists.
+ - `SyntaxError` - The request was malformed.
+ - `InvalidQuery` - The query was invalid.
+ - `InvalidBody` - The body was invalid.
+ - `InvalidBson` - The BSON was invalid.
+ - `InvalidAuth` - The authentication was invalid.
+ - `NotAuthorized` - The client is not authorized to perform the requested action.
+ - `Reserved` - Cannot be used.
