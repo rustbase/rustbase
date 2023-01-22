@@ -30,7 +30,11 @@ pub struct Database {
 
 #[async_trait]
 impl Wirewave for Database {
-    async fn request(&self, request: Request) -> Result<Response, Status> {
+    async fn request(
+        &self,
+        request: Request,
+        username: Option<String>,
+    ) -> Result<Response, Status> {
         let body = request.body;
 
         if body.is_empty() {
@@ -59,6 +63,7 @@ impl Wirewave for Database {
                         self.config.clone(),
                         self.system_db.clone(),
                         database.to_string(),
+                        username,
                     );
 
                     core.run(query[0].clone())

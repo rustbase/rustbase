@@ -778,14 +778,25 @@ dependencies = [
  "proctitle",
  "rand",
  "rayon",
+ "rustbase-scram",
  "rustls",
  "rustls-pemfile",
- "scram",
  "serde",
  "serde_json",
  "tokio",
  "tokio-rustls",
  "winres",
+]
+
+[[package]]
+name = "rustbase-scram"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9097449fcf2a24199e546f268629049f6ac856d852d40f8f9f9757ec80a23bc2"
+dependencies = [
+ "base64",
+ "rand",
+ "ring",
 ]
 
 [[package]]
@@ -820,17 +831,6 @@ name = "scopeguard"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
-
-[[package]]
-name = "scram"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7679a5e6b97bac99b2c208894ba0d34b17d9657f0b728c1cd3bf1c5f7f6ebe88"
-dependencies = [
- "base64",
- "rand",
- "ring",
-]
 
 [[package]]
 name = "scratch"
