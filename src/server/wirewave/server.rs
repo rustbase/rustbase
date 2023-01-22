@@ -238,6 +238,8 @@ where
 
     while let Ok(n) = socket.read(buffer).await {
         if n == 0 {
+            socket.shutdown().await.ok();
+            socket.flush().await.ok();
             break;
         }
 
