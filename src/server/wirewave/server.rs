@@ -264,6 +264,10 @@ where
     loop {
         let request_bytes = read_socket(&mut socket, &mut buffer).await.unwrap();
 
+        if request_bytes.is_empty() {
+            break;
+        }
+
         match process_request(&request_bytes[..]) {
             Ok(request) => {
                 let response = match callback(request).await {
