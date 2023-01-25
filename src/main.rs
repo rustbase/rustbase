@@ -19,7 +19,17 @@ struct Args {
 }
 
 #[derive(clap_derive::Subcommand)]
-pub enum SubCommand {}
+pub enum SubCommand {
+    Restore {
+        /// The path to the snapshot file
+        #[clap(short, long)]
+        path: String,
+
+        /// The name of the database to restore to
+        #[clap(short, long)]
+        db: String,
+    },
+}
 
 #[tokio::main]
 async fn main() {
