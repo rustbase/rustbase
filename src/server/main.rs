@@ -144,7 +144,7 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
 
 pub fn default_dustdata_config(data_path: &Path) -> DustDataConfig {
     DustDataConfig {
-        path: data_path.to_str().unwrap().to_string(),
+        path: data_path.to_path_buf(),
         lsm_config: LsmConfig {
             flush_threshold: Size::Megabytes(256),
         },
