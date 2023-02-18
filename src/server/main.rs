@@ -66,7 +66,7 @@ impl Wirewave for Database {
                         username,
                     );
 
-                    core.run(query[0].clone())
+                    core.run_ast(query[0].clone())
                 }
             })
     }

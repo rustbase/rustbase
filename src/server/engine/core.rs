@@ -1,10 +1,6 @@
 use bson::Bson;
 use dustdata::DustData;
-use dustdata::Error as DustDataError;
-use rand::Rng;
-use rustbase_scram::hash_password;
 use std::collections::HashMap;
-use std::path::Path;
 use std::sync::{Arc, RwLock};
 
 use crate::config;
@@ -13,7 +9,6 @@ use crate::server;
 
 use config::schema;
 use server::cache;
-use server::route;
 use server::wirewave;
 
 use cache::Cache;
@@ -21,18 +16,12 @@ use query::parser::{ASTNode, Keywords, Verbs};
 use wirewave::authorization::UserPermission;
 use wirewave::server::{Response, Status};
 
-pub struct Core {
-    cache: Arc<RwLock<Cache>>,
-    routers: Arc<RwLock<HashMap<String, DustData>>>,
-    config: Arc<schema::RustbaseConfig>,
-    current_database: String,
-    system_db: Arc<RwLock<DustData>>,
-    current_user: Option<String>,
-}
+use interface::TransactionError;
 
-enum TransactionError {
-    InternalError(DustDataError),
-    ExternalError(Status, String),
+use super::interface;
+
+pub struct Core {
+    interface: interface::DustDataInterface,
 }
 
 impl Core {
@@ -44,17 +33,28 @@ impl Core {
         current_database: String,
         current_user: Option<String>,
     ) -> Self {
-        Self {
+        let interface = interface::DustDataInterface::new(
             cache,
             routers,
             config,
-            current_database,
             system_db,
+            current_database,
             current_user,
-        }
+        );
+
+        Self { interface }
     }
 
-    pub fn run(&mut self, ast: ASTNode) -> Result<Response, Status> {
+    /// `run_ast` takes an ASTNode and returns a Result<Response, Status>
+    ///
+    /// Arguments:
+    ///
+    /// * `ast`: The ASTNode that is being run.
+    ///
+    /// Returns:
+    ///
+    /// A Result<Response, Status>
+    pub fn run_ast(&mut self, ast: ASTNode) -> Result<Response, Status> {
         match ast {
             ASTNode::IntoExpression {
                 keyword,
@@ -73,6 +73,18 @@ impl Core {
         }
     }
 
+    /// `expr_into` is a function that takes a keyword, a value, and an expression, and returns a response
+    /// or a status
+    ///
+    /// Arguments:
+    ///
+    /// * `keyword`: The keyword that was used in the query.
+    /// * `value`: The value to be inserted or updated.
+    /// * `expr`: The expression to be evaluated.
+    ///
+    /// Returns:
+    ///
+    /// A response or a status.
     fn expr_into(
         &mut self,
         keyword: Keywords,
@@ -80,54 +92,26 @@ impl Core {
         expr: ASTNode,
     ) -> Result<Response, Status> {
         match keyword {
-            Keywords::Insert => {
-                let key = match expr {
-                    ASTNode::Identifier(ident) => ident,
-                    _ => return syntax_error("key must be an identifier"),
-                };
+            Keywords::Insert => self.ast_into_insert(value, expr),
 
-                let value = match value {
-                    ASTNode::Bson(json) => json,
-                    _ => return syntax_error("value must be a json object"),
-                };
-
-                match self.insert_into_dustdata(key, value) {
-                    Ok(_) => Ok(Response {
-                        message: None,
-                        status: Status::Ok,
-                        body: None,
-                    }),
-
-                    Err(e) => self.dd_error(e),
-                }
-            }
-
-            Keywords::Update => {
-                let key = match expr {
-                    ASTNode::Identifier(ident) => ident,
-                    _ => return syntax_error("key must be an identifier"),
-                };
-
-                let value = match value {
-                    ASTNode::Bson(json) => json,
-                    _ => return syntax_error("value must be a json object"),
-                };
-
-                match self.update_dustdata(key, value) {
-                    Ok(_) => Ok(Response {
-                        message: None,
-                        status: Status::Ok,
-                        body: None,
-                    }),
-
-                    Err(e) => self.dd_error(e),
-                }
-            }
+            Keywords::Update => self.ast_into_update(value, expr),
 
             _ => Err(Status::InvalidQuery),
         }
     }
 
+    /// It takes a keyword, a verb, and an optional expression, and then it matches on the keyword and verb
+    /// to determine which function to call
+    ///
+    /// Arguments:
+    ///
+    /// * `keyword`: The keyword that the user is using.
+    /// * `verb`: The verb of the query.
+    /// * `expr`: Option<Vec<ASTNode>>
+    ///
+    /// Returns:
+    ///
+    /// A response or a status.
     fn monadic_expr(
         &mut self,
         keyword: Keywords,
@@ -136,225 +120,19 @@ impl Core {
     ) -> Result<Response, Status> {
         match keyword {
             Keywords::Insert => match verb {
-                Verbs::User => {
-                    if expr.is_none() {
-                        return Err(Status::InvalidQuery);
-                    }
-
-                    let expr = expr.unwrap();
-
-                    let mut username = String::new();
-                    let mut permission = String::new();
-                    let mut password = String::new();
-
-                    // idk if this is the best way to do this
-                    for node in expr {
-                        match node {
-                            // this will find the password and permission
-                            ASTNode::AssignmentExpression { ident, value } => {
-                                match ident.as_str() {
-                                    "password" => {
-                                        password = match *value {
-                                            ASTNode::Bson(s) => {
-                                                let s = s.as_str();
-
-                                                // if the password is not a string, return an error
-                                                if let Some(s) = s {
-                                                    s.to_string()
-                                                } else {
-                                                    return syntax_error(
-                                                        "password must be a string",
-                                                    );
-                                                }
-                                            }
-
-                                            _ => {
-                                                return syntax_error("password must be a string");
-                                            }
-                                        }
-                                    }
-
-                                    "permission" => {
-                                        permission = match *value {
-                                            ASTNode::Bson(s) => {
-                                                let s = s.as_str();
-
-                                                // if the permission is not a string, return an error
-                                                if let Some(s) = s {
-                                                    s.to_string()
-                                                } else {
-                                                    return syntax_error(
-                                                        "permission must be a string",
-                                                    );
-                                                }
-                                            }
-                                            _ => {
-                                                return syntax_error("permission must be a string");
-                                            }
-                                        }
-                                    }
-
-                                    _ => {}
-                                }
-                            }
-
-                            ASTNode::Identifier(ref ident) => username = ident.clone(),
-
-                            _ => {}
-                        }
-                    }
-
-                    if username.is_empty() || password.is_empty() || permission.is_empty() {
-                        return syntax_error("username, password, and permission are required");
-                    }
-
-                    let permission = UserPermission::from_str(permission.as_str());
-
-                    if permission.is_none() {
-                        return syntax_error(
-                            "permission must be 'read' or 'write', 'read_and_write', or 'admin'",
-                        );
-                    }
-
-                    match self.create_user(username, password, permission.unwrap()) {
-                        Ok(_) => Ok(Response {
-                            message: None,
-                            status: Status::Ok,
-                            body: None,
-                        }),
-
-                        Err(e) => self.dd_error(e),
-                    }
-                }
+                Verbs::User => self.ast_user_insert(expr),
 
                 _ => Err(Status::InvalidQuery),
             },
 
             Keywords::Delete => match verb {
-                Verbs::Database => {
-                    let database = if let Some(expr) = expr {
-                        match expr[0] {
-                            ASTNode::Identifier(ref ident) => ident.clone(),
-                            _ => {
-                                unreachable!()
-                            }
-                        }
-                    } else {
-                        self.current_database.clone()
-                    };
+                Verbs::Database => self.ast_database_delete(expr),
 
-                    match self.delete_database(database) {
-                        Ok(_) => Ok(Response {
-                            message: None,
-                            status: Status::Ok,
-                            body: None,
-                        }),
-
-                        Err(e) => self.dd_error(e),
-                    }
-                }
-
-                Verbs::User => {
-                    let user = if let Some(expr) = expr {
-                        match expr[0] {
-                            ASTNode::Identifier(ref ident) => ident.clone(),
-                            _ => {
-                                unreachable!()
-                            }
-                        }
-                    } else {
-                        return Err(Status::SyntaxError);
-                    };
-
-                    match self.delete_user(user) {
-                        Ok(_) => Ok(Response {
-                            message: None,
-                            status: Status::Ok,
-                            body: None,
-                        }),
-
-                        Err(e) => self.dd_error(e),
-                    }
-                }
+                Verbs::User => self.ast_user_delete(expr),
             },
 
             Keywords::Update => match verb {
-                Verbs::User => {
-                    if expr.is_none() {
-                        return Err(Status::InvalidQuery);
-                    }
-
-                    let mut password: Option<String> = None;
-                    let mut permission: Option<String> = None;
-                    let mut username = String::new();
-
-                    for node in expr.unwrap() {
-                        match node {
-                            // this will find the password and permission
-                            ASTNode::AssignmentExpression { ident, value } => {
-                                match ident.as_str() {
-                                    "password" => {
-                                        password = match *value {
-                                            ASTNode::Bson(s) => {
-                                                let s = s.as_str();
-
-                                                // if the password is not a string, return an error
-                                                if let Some(s) = s {
-                                                    Some(s.to_string())
-                                                } else {
-                                                    return syntax_error(
-                                                        "password must be a string",
-                                                    );
-                                                }
-                                            }
-                                            _ => None,
-                                        }
-                                    }
-
-                                    "permission" => {
-                                        permission = match *value {
-                                            ASTNode::Bson(s) => {
-                                                let s = s.as_str();
-
-                                                // if the password is not a string, return an error
-                                                if let Some(s) = s {
-                                                    Some(s.to_string())
-                                                } else {
-                                                    return syntax_error(
-                                                        "permission must be a string",
-                                                    );
-                                                }
-                                            }
-                                            _ => None,
-                                        }
-                                    }
-
-                                    _ => {}
-                                }
-                            }
-
-                            ASTNode::Identifier(ref ident) => username = ident.clone(),
-
-                            _ => {}
-                        }
-                    }
-
-                    let permission: Option<UserPermission> = if let Some(permission) = permission {
-                        UserPermission::from_str(permission.as_str())
-                    } else {
-                        None
-                    };
-
-                    match self.update_user(username, password, permission) {
-                        Ok(_) => Ok(Response {
-                            message: None,
-                            status: Status::Ok,
-                            body: None,
-                        }),
-
-                        Err(e) => self.dd_error(e),
-                    }
-                }
+                Verbs::User => self.ast_user_update(expr),
 
                 _ => Err(Status::InvalidQuery),
             },
@@ -363,431 +141,427 @@ impl Core {
         }
     }
 
+    /// It takes a keyword and an identifier, and returns a response
+    ///
+    /// Arguments:
+    ///
+    /// * `keyword`: The keyword that was used to start the query.
+    /// * `ident`: The identifier of the object to be operated on.
+    ///
+    /// Returns:
+    ///
+    /// A response object.
     fn sgl_expr(
         &mut self,
         keyword: Keywords,
         ident: Option<Box<ASTNode>>,
     ) -> Result<Response, Status> {
         match keyword {
-            Keywords::Get => {
-                if ident.is_none() {
-                    return Err(Status::InvalidQuery);
-                }
+            Keywords::Get => self.ast_sgl_get(ident),
 
-                let key = match *ident.unwrap() {
-                    ASTNode::Identifier(ident) => ident,
-                    _ => {
-                        unreachable!()
-                    }
-                };
+            Keywords::Delete => self.ast_sgl_delete(ident),
 
-                match self.get_from_dustdata(key) {
-                    Ok(value) => Ok(Response {
-                        message: None,
-                        status: Status::Ok,
-                        body: Some(value),
-                    }),
-
-                    Err(e) => self.dd_error(e),
-                }
-            }
-
-            Keywords::Delete => {
-                let key = match *ident.unwrap() {
-                    ASTNode::Identifier(ident) => ident,
-                    _ => {
-                        unreachable!()
-                    }
-                };
-
-                match self.delete_from_dustdata(key) {
-                    Ok(_) => Ok(Response {
-                        message: None,
-                        status: Status::Ok,
-                        body: None,
-                    }),
-
-                    Err(e) => self.dd_error(e),
-                }
-            }
-
-            Keywords::List => match self.list_from_dustdata() {
-                Ok(keys) => Ok(Response {
-                    message: None,
-                    status: Status::Ok,
-                    body: Some(Bson::Array(keys.into_iter().map(Bson::String).collect())),
-                }),
-
-                Err(e) => self.dd_error(e),
-            },
+            Keywords::List => self.ast_sgl_list(),
 
             _ => Err(Status::InvalidQuery),
         }
     }
 
-    // user dd interface
+    /// It takes a key and a value, and inserts the value into the database
+    ///
+    /// Arguments:
+    ///
+    /// * `value`: The value to insert into the database.
+    /// * `expr`: The expression that is being evaluated.
+    ///
+    /// Returns:
+    ///
+    /// A response object.
+    fn ast_into_insert(&mut self, value: ASTNode, expr: ASTNode) -> Result<Response, Status> {
+        let key = match expr {
+            ASTNode::Identifier(ident) => ident,
+            _ => return syntax_error("key must be an identifier"),
+        };
 
-    fn insert_into_dustdata(&mut self, key: String, value: Bson) -> Result<(), TransactionError> {
-        if self.current_database == "_default" {
-            return Err(TransactionError::ExternalError(
-                Status::Reserved,
-                "database reserved".to_string(),
-            ));
+        let value = match value {
+            ASTNode::Bson(json) => json,
+            _ => return syntax_error("value must be a json object"),
+        };
+
+        match self.interface.insert_into_dustdata(key, value) {
+            Ok(_) => Ok(Response {
+                message: None,
+                status: Status::Ok,
+                body: None,
+            }),
+
+            Err(e) => self.dd_error(e),
+        }
+    }
+
+    /// It takes an ASTNode and an ASTNode, and returns a Result<Response, Status>
+    ///
+    /// Arguments:
+    ///
+    /// * `value`: The value to update the key with.
+    /// * `expr`: The expression to evaluate.
+    ///
+    /// Returns:
+    ///
+    /// A response object.
+    fn ast_into_update(&mut self, value: ASTNode, expr: ASTNode) -> Result<Response, Status> {
+        let key = match expr {
+            ASTNode::Identifier(ident) => ident,
+            _ => return syntax_error("key must be an identifier"),
+        };
+
+        let value = match value {
+            ASTNode::Bson(json) => json,
+            _ => return syntax_error("value must be a json object"),
+        };
+
+        match self.interface.update_dustdata(key, value) {
+            Ok(_) => Ok(Response {
+                message: None,
+                status: Status::Ok,
+                body: None,
+            }),
+
+            Err(e) => self.dd_error(e),
+        }
+    }
+
+    /// It takes a `Vec<ASTNode>` and returns a `Result<Response, Status>`
+    ///
+    /// Arguments:
+    ///
+    /// * `expr`: Option<Vec<ASTNode>>
+    ///
+    /// Returns:
+    ///
+    /// A response object
+    fn ast_user_insert(&mut self, expr: Option<Vec<ASTNode>>) -> Result<Response, Status> {
+        if expr.is_none() {
+            return Err(Status::InvalidQuery);
         }
 
-        if let Some(current_user) = &self.current_user {
-            if !self.user_has_perm(current_user.clone(), UserPermission::Write)? {
-                return Err(TransactionError::ExternalError(
-                    Status::NotAuthorized,
-                    "permission denied".to_string(),
-                ));
+        let expr = expr.unwrap();
+
+        let mut username = String::new();
+        let mut permission = String::new();
+        let mut password = String::new();
+
+        // idk if this is the best way to do this
+        for node in expr {
+            match node {
+                // this will find the password and permission
+                ASTNode::AssignmentExpression { ident, value } => {
+                    match ident.as_str() {
+                        "password" => {
+                            password = match *value {
+                                ASTNode::Bson(s) => {
+                                    let s = s.as_str();
+
+                                    // if the password is not a string, return an error
+                                    if let Some(s) = s {
+                                        s.to_string()
+                                    } else {
+                                        return syntax_error("password must be a string");
+                                    }
+                                }
+
+                                _ => {
+                                    return syntax_error("password must be a string");
+                                }
+                            }
+                        }
+
+                        "permission" => {
+                            permission = match *value {
+                                ASTNode::Bson(s) => {
+                                    let s = s.as_str();
+
+                                    // if the permission is not a string, return an error
+                                    if let Some(s) = s {
+                                        s.to_string()
+                                    } else {
+                                        return syntax_error("permission must be a string");
+                                    }
+                                }
+                                _ => {
+                                    return syntax_error("permission must be a string");
+                                }
+                            }
+                        }
+
+                        _ => {}
+                    }
+                }
+
+                ASTNode::Identifier(ref ident) => username = ident.clone(),
+
+                _ => {}
             }
         }
 
-        let mut routers = self.routers.write().unwrap();
+        if username.is_empty() || password.is_empty() || permission.is_empty() {
+            return syntax_error("username, password, and permission are required");
+        }
 
-        if !routers.contains_key(&self.current_database) {
-            let dd = route::create_dustdata(
-                &Path::new(&self.config.database.path).join(self.current_database.clone()),
+        let permission = UserPermission::from_str(permission.as_str());
+
+        if permission.is_none() {
+            return syntax_error(
+                "permission must be 'read' or 'write', 'read_and_write', or 'admin'",
             );
-
-            routers.insert(self.current_database.clone(), dd);
-            println!("[Engine] created database {}", self.current_database);
         }
 
-        let dd = routers.get_mut(&self.current_database).unwrap();
+        match self
+            .interface
+            .create_user(username, password, permission.unwrap())
+        {
+            Ok(_) => Ok(Response {
+                message: None,
+                status: Status::Ok,
+                body: None,
+            }),
 
-        dd.insert(&key, value)
-            .map_err(TransactionError::InternalError)
-    }
-
-    fn update_dustdata(&mut self, key: String, value: Bson) -> Result<(), TransactionError> {
-        if self.current_database == "_default" {
-            return Err(TransactionError::ExternalError(
-                Status::Reserved,
-                "database reserved".to_string(),
-            ));
-        }
-
-        if let Some(current_user) = &self.current_user {
-            if !self.user_has_perm(current_user.clone(), UserPermission::Write)? {
-                return Err(TransactionError::ExternalError(
-                    Status::NotAuthorized,
-                    "permission denied".to_string(),
-                ));
-            }
-        }
-
-        let mut cache = self.cache.write().unwrap();
-        let cache_key = format!("{}:{}", self.current_database, key);
-        cache.remove(&cache_key).ok();
-
-        let mut routers = self.routers.write().unwrap();
-        let dd = routers.get_mut(&self.current_database);
-
-        if let Some(dd) = dd {
-            dd.update(&key, value)
-                .map_err(TransactionError::InternalError)
-        } else {
-            Err(TransactionError::ExternalError(
-                Status::NotFound,
-                "database not found".to_string(),
-            ))
+            Err(e) => self.dd_error(e),
         }
     }
 
-    fn delete_from_dustdata(&mut self, key: String) -> Result<(), TransactionError> {
-        if self.current_database == "_default" {
-            return Err(TransactionError::ExternalError(
-                Status::Reserved,
-                "database reserved".to_string(),
-            ));
-        }
-
-        if let Some(current_user) = &self.current_user {
-            if !self.user_has_perm(current_user.clone(), UserPermission::Write)? {
-                return Err(TransactionError::ExternalError(
-                    Status::NotAuthorized,
-                    "permission denied".to_string(),
-                ));
-            }
-        }
-
-        let mut cache = self.cache.write().unwrap();
-        let cache_key = format!("{}:{}", self.current_database, key);
-        cache.remove(&cache_key).ok();
-
-        let mut routers = self.routers.write().unwrap();
-        let dd = routers.get_mut(&self.current_database);
-
-        if let Some(dd) = dd {
-            dd.delete(&key).map_err(TransactionError::InternalError)
-        } else {
-            Err(TransactionError::ExternalError(
-                Status::NotFound,
-                "database not found".to_string(),
-            ))
-        }
-    }
-
-    fn get_from_dustdata(&mut self, key: String) -> Result<Bson, TransactionError> {
-        if self.current_database == "_default" {
-            return Err(TransactionError::ExternalError(
-                Status::Reserved,
-                "database reserved".to_string(),
-            ));
-        }
-
-        if let Some(current_user) = &self.current_user {
-            if !self.user_has_perm(current_user.clone(), UserPermission::Read)? {
-                return Err(TransactionError::ExternalError(
-                    Status::NotAuthorized,
-                    "permission denied".to_string(),
-                ));
-            }
-        }
-
-        let mut cache = self.cache.write().unwrap();
-
-        let cache_key = format!("{}:{}", self.current_database, key);
-
-        if let Some(bson) = cache.get(&cache_key) {
-            return Ok(bson.clone());
-        }
-
-        let routers = self.routers.read().unwrap();
-        let dd = routers.get(&self.current_database);
-
-        if let Some(dd) = dd {
-            let value = dd.get(&key).map_err(TransactionError::InternalError)?;
-
-            if let Some(bson) = value {
-                cache.insert(cache_key, bson.clone()).unwrap();
-
-                Ok(bson)
-            } else {
-                Err(TransactionError::ExternalError(
-                    Status::NotFound,
-                    "key not found".to_string(),
-                ))
+    /// `ast_user_delete` is a function that takes a `Option<Vec<ASTNode>>` and returns a `Result<Response,
+    /// Status>`
+    ///
+    /// Arguments:
+    ///
+    /// * `expr`: The expression that was passed to the command.
+    ///
+    /// Returns:
+    ///
+    /// A `Result` type.
+    fn ast_user_delete(&mut self, expr: Option<Vec<ASTNode>>) -> Result<Response, Status> {
+        let user = if let Some(expr) = expr {
+            match expr[0] {
+                ASTNode::Identifier(ref ident) => ident.clone(),
+                _ => {
+                    unreachable!()
+                }
             }
         } else {
-            Err(TransactionError::ExternalError(
-                Status::NotFound,
-                "database not found".to_string(),
-            ))
-        }
-    }
-
-    fn list_from_dustdata(&mut self) -> Result<Vec<String>, TransactionError> {
-        if self.current_database == "_default" {
-            return Err(TransactionError::ExternalError(
-                Status::Reserved,
-                "database reserved".to_string(),
-            ));
-        }
-
-        if let Some(current_user) = &self.current_user {
-            if !self.user_has_perm(current_user.clone(), UserPermission::Read)? {
-                return Err(TransactionError::ExternalError(
-                    Status::NotAuthorized,
-                    "permission denied".to_string(),
-                ));
-            }
-        }
-
-        let routers = self.routers.read().unwrap();
-        let dd = routers.get(&self.current_database).unwrap();
-
-        dd.list_keys().map_err(TransactionError::InternalError)
-    }
-
-    fn delete_database(&mut self, database: String) -> Result<(), TransactionError> {
-        if self.current_database == "_default" {
-            return Err(TransactionError::ExternalError(
-                Status::Reserved,
-                "database reserved".to_string(),
-            ));
-        }
-
-        if let Some(current_user) = &self.current_user {
-            if !self.user_has_perm(current_user.clone(), UserPermission::Admin)? {
-                return Err(TransactionError::ExternalError(
-                    Status::NotAuthorized,
-                    "permission.denied".to_string(),
-                ));
-            }
-        }
-
-        let mut routers = self.routers.write().unwrap();
-
-        if let Some(mut dd) = routers.remove(&database) {
-            dd.lsm.drop();
-            drop(dd);
-
-            let database = database.clone();
-
-            // using thread to delete database because it's a blocking operation
-            let c_db = database.clone();
-            let c_path = self.config.database.path.clone();
-            std::thread::spawn(move || {
-                route::remove_dustdata(&c_path, c_db);
-            });
-
-            println!("[Engine] database {} deleted", database);
-
-            Ok(())
-        } else {
-            Err(TransactionError::ExternalError(
-                Status::NotFound,
-                "database not found".to_string(),
-            ))
-        }
-    }
-
-    // auth interface
-    fn create_user(
-        &mut self,
-        username: String,
-        password: String,
-        user_permission: UserPermission,
-    ) -> Result<(), TransactionError> {
-        if let Some(current_user) = &self.current_user {
-            if !self.user_has_perm(current_user.clone(), UserPermission::Admin)? {
-                return Err(TransactionError::ExternalError(
-                    Status::Error,
-                    "permission.denied".to_string(),
-                ));
-            }
-        }
-
-        let mut dd = self.system_db.write().unwrap();
-
-        let salt = rand::thread_rng().gen::<[u8; 32]>().to_vec();
-        let hash_password =
-            hash_password(&password, std::num::NonZeroU32::new(4096).unwrap(), &salt).to_vec();
-
-        let hash_password = bson::Binary {
-            subtype: bson::spec::BinarySubtype::Generic,
-            bytes: hash_password,
+            return Err(Status::SyntaxError);
         };
 
-        let salt = bson::Binary {
-            subtype: bson::spec::BinarySubtype::Generic,
-            bytes: salt,
-        };
+        match self.interface.delete_user(user) {
+            Ok(_) => Ok(Response {
+                message: None,
+                status: Status::Ok,
+                body: None,
+            }),
 
-        let doc = bson::doc! {
-            "password": hash_password,
-            "salt": salt,
-            "permission": user_permission as i32,
-        };
-
-        dd.insert(&username, Bson::Document(doc))
-            .map_err(TransactionError::InternalError)
+            Err(e) => self.dd_error(e),
+        }
     }
 
-    fn delete_user(&mut self, username: String) -> Result<(), TransactionError> {
-        if let Some(current_user) = &self.current_user {
-            if !self.user_has_perm(current_user.clone(), UserPermission::Admin)? {
-                return Err(TransactionError::ExternalError(
-                    Status::NotAuthorized,
-                    "permission denied".to_string(),
-                ));
+    /// It takes a vector of ASTNodes, and if the vector is not empty, it will iterate through the
+    /// vector, and if the ASTNode is an AssignmentExpression, it will check if the ident is "password"
+    /// or "permission", and if it is, it will check if the value is a Bson, and if it is, it will check
+    /// if the Bson is a string, and if it is, it will set the password or permission to the string
+    ///
+    /// Arguments:
+    ///
+    /// * `expr`: The ASTNode that represents the expression.
+    ///
+    /// Returns:
+    ///
+    /// A response object.
+    fn ast_user_update(&mut self, expr: Option<Vec<ASTNode>>) -> Result<Response, Status> {
+        if expr.is_none() {
+            return Err(Status::InvalidQuery);
+        }
+
+        let mut password: Option<String> = None;
+        let mut permission: Option<String> = None;
+        let mut username = String::new();
+
+        for node in expr.unwrap() {
+            match node {
+                // this will find the password and permission
+                ASTNode::AssignmentExpression { ident, value } => {
+                    match ident.as_str() {
+                        "password" => {
+                            password = match *value {
+                                ASTNode::Bson(s) => {
+                                    let s = s.as_str();
+
+                                    // if the password is not a string, return an error
+                                    if let Some(s) = s {
+                                        Some(s.to_string())
+                                    } else {
+                                        return syntax_error("password must be a string");
+                                    }
+                                }
+                                _ => None,
+                            }
+                        }
+
+                        "permission" => {
+                            permission = match *value {
+                                ASTNode::Bson(s) => {
+                                    let s = s.as_str();
+
+                                    // if the password is not a string, return an error
+                                    if let Some(s) = s {
+                                        Some(s.to_string())
+                                    } else {
+                                        return syntax_error("permission must be a string");
+                                    }
+                                }
+                                _ => None,
+                            }
+                        }
+
+                        _ => {}
+                    }
+                }
+
+                ASTNode::Identifier(ref ident) => username = ident.clone(),
+
+                _ => {}
             }
         }
 
-        let mut dd = self.system_db.write().unwrap();
+        let permission: Option<UserPermission> = if let Some(permission) = permission {
+            UserPermission::from_str(permission.as_str())
+        } else {
+            None
+        };
 
-        dd.delete(&username)
-            .map_err(TransactionError::InternalError)
+        match self.interface.update_user(username, password, permission) {
+            Ok(_) => Ok(Response {
+                message: None,
+                status: Status::Ok,
+                body: None,
+            }),
+
+            Err(e) => self.dd_error(e),
+        }
     }
 
-    fn update_user(
-        &mut self,
-        username: String,
-        password: Option<String>,
-        user_permission: Option<UserPermission>,
-    ) -> Result<(), TransactionError> {
-        if let Some(current_user) = &self.current_user {
-            if !self.user_has_perm(current_user.clone(), UserPermission::Admin)? {
-                return Err(TransactionError::ExternalError(
-                    Status::NotAuthorized,
-                    "permission denied".to_string(),
-                ));
+    /// `if the user provided a database name, use it, otherwise use the current database`
+    ///
+    /// Arguments:
+    ///
+    /// * `expr`: The expression that was passed to the function.
+    ///
+    /// Returns:
+    ///
+    /// A response object.
+    fn ast_database_delete(&mut self, expr: Option<Vec<ASTNode>>) -> Result<Response, Status> {
+        let database = if let Some(expr) = expr {
+            match expr[0] {
+                ASTNode::Identifier(ref ident) => ident.clone(),
+                _ => {
+                    unreachable!()
+                }
             }
+        } else {
+            self.interface.current_database.clone()
+        };
+
+        match self.interface.delete_database(database) {
+            Ok(_) => Ok(Response {
+                message: None,
+                status: Status::Ok,
+                body: None,
+            }),
+
+            Err(e) => self.dd_error(e),
         }
-
-        let mut dd = self.system_db.write().unwrap();
-
-        let user = dd.get(&username).map_err(TransactionError::InternalError)?;
-
-        if user.is_none() {
-            return Err(TransactionError::ExternalError(
-                Status::NotFound,
-                "user not found".to_string(),
-            ));
-        }
-
-        let mut user = user.unwrap();
-        let user = user.as_document_mut().unwrap();
-
-        if let Some(password) = password {
-            let salt = rand::thread_rng().gen::<[u8; 32]>().to_vec();
-            let hash_password =
-                hash_password(&password, std::num::NonZeroU32::new(4096).unwrap(), &salt).to_vec();
-
-            let hash_password = bson::Binary {
-                subtype: bson::spec::BinarySubtype::Generic,
-                bytes: hash_password,
-            };
-
-            let salt = bson::Binary {
-                subtype: bson::spec::BinarySubtype::Generic,
-                bytes: salt,
-            };
-
-            let doc = bson::doc! {
-                "password": hash_password,
-                "salt": salt,
-            };
-
-            user.extend(doc);
-        }
-
-        if let Some(user_permission) = user_permission {
-            user.extend(bson::doc! {
-                "permission": user_permission as i32,
-            });
-        }
-
-        dd.update(&username, bson::to_bson(user).unwrap())
-            .map_err(TransactionError::InternalError)
     }
 
-    fn user_has_perm(
-        &self,
-        username: String,
-        perm: UserPermission,
-    ) -> Result<bool, TransactionError> {
-        let dd = self.system_db.read().unwrap();
-
-        let user = dd.get(&username).map_err(TransactionError::InternalError)?;
-
-        if user.is_none() {
-            return Err(TransactionError::ExternalError(
-                Status::NotFound,
-                "user not found".to_string(),
-            ));
+    /// It gets a value from the database.
+    ///
+    /// Arguments:
+    ///
+    /// * `ident`: The identifier of the key to get.
+    ///
+    /// Returns:
+    ///
+    /// A `Result` type.
+    fn ast_sgl_get(&mut self, ident: Option<Box<ASTNode>>) -> Result<Response, Status> {
+        if ident.is_none() {
+            return Err(Status::InvalidQuery);
         }
 
-        let user = user.unwrap();
-        let user = user.as_document().unwrap();
+        let key = match *ident.unwrap() {
+            ASTNode::Identifier(ident) => ident,
+            _ => {
+                unreachable!()
+            }
+        };
 
-        let user_permission = user.get("permission").unwrap().as_i32().unwrap();
-        let user_permission = UserPermission::from_i32(user_permission).unwrap();
+        match self.interface.get_from_dustdata(key) {
+            Ok(value) => Ok(Response {
+                message: None,
+                status: Status::Ok,
+                body: Some(value),
+            }),
 
-        Ok(user_permission.cmp(&perm))
+            Err(e) => self.dd_error(e),
+        }
+    }
+
+    /// It deletes a key from the database.
+    ///
+    /// Arguments:
+    ///
+    /// * `ident`: The identifier of the key to delete.
+    ///
+    /// Returns:
+    ///
+    /// A response object.
+    fn ast_sgl_delete(&mut self, ident: Option<Box<ASTNode>>) -> Result<Response, Status> {
+        let key = match *ident.unwrap() {
+            ASTNode::Identifier(ident) => ident,
+            _ => {
+                unreachable!()
+            }
+        };
+
+        match self.interface.delete_from_dustdata(key) {
+            Ok(_) => Ok(Response {
+                message: None,
+                status: Status::Ok,
+                body: None,
+            }),
+
+            Err(e) => self.dd_error(e),
+        }
+    }
+
+    /// `fn ast_sgl_list(&self, ident: Option<Box<ASTNode>>) -> Result<Response, Status>`
+    ///
+    /// The function name is `ast_sgl_list` and it takes two arguments: `&self` and `ident:
+    /// Option<Box<ASTNode>>`. The return type is `Result<Response, Status>`
+    ///
+    /// Arguments:
+    ///
+    /// * `ident`: The identifier of the node.
+    ///
+    /// Returns:
+    ///
+    /// A `Response` object.
+    fn ast_sgl_list(&mut self) -> Result<Response, Status> {
+        match self.interface.list_from_dustdata() {
+            Ok(keys) => Ok(Response {
+                message: None,
+                status: Status::Ok,
+                body: Some(Bson::Array(keys.into_iter().map(Bson::String).collect())),
+            }),
+
+            Err(e) => self.dd_error(e),
+        }
     }
 
     // error
