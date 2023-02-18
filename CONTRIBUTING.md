@@ -7,23 +7,12 @@ Every help is welcome! See how to contribute below
  3. Create a branch to commit your feature or fix: `git checkout -b my-branch`
  4. And make your changes!
 
-## Unit tests
-If are you creating a new feature, make sure to create a unit tests to it. To make a unit tests, add the following code in the same file of you feature: 
-```rust
-// Unit tests
-#[cfg(test)]
-mod your_feature_tests {
-    #[test]
-    fn testing_feature() {
-        ...
-    }
-}
-```
+## Git flow
+We use git flow to organize our branches. See more about git flow [here](https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow)
 
-### Running unit tests
-To run a unit test use: `cargo test`
-
-See more about unit tests [here](https://doc.rust-lang.org/rust-by-example/testing/unit_testing.html)
+## Main branches
+* `stable` - The main branch. It's the branch that will be deployed to production
+* `develop` - The branch that will be deployed to staging
 
 ## Commit messages
 We suggest that commit messages follow the *conventional commit*.

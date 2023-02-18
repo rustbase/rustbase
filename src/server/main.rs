@@ -30,7 +30,11 @@ pub struct Database {
 
 #[async_trait]
 impl Wirewave for Database {
-    async fn request(&self, request: Request) -> Result<Response, Status> {
+    async fn request(
+        &self,
+        request: Request,
+        username: Option<String>,
+    ) -> Result<Response, Status> {
         let body = request.body;
 
         if body.is_empty() {
@@ -59,9 +63,10 @@ impl Wirewave for Database {
                         self.config.clone(),
                         self.system_db.clone(),
                         database.to_string(),
+                        username,
                     );
 
-                    core.run(query[0].clone())
+                    core.run_ast(query[0].clone())
                 }
             })
     }
@@ -139,7 +144,7 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
 
 pub fn default_dustdata_config(data_path: &Path) -> DustDataConfig {
     DustDataConfig {
-        path: data_path.to_str().unwrap().to_string(),
+        path: data_path.to_path_buf(),
         lsm_config: LsmConfig {
             flush_threshold: Size::Megabytes(256),
         },

@@ -1,4 +1,4 @@
-use scram::{AuthenticationProvider, AuthenticationStatus, PasswordInfo, ScramServer};
+use rustbase_scram::{AuthenticationProvider, AuthenticationStatus, PasswordInfo, ScramServer};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
 
@@ -63,7 +63,7 @@ fn process_authentication_request(buffer: &[u8]) -> Result<AuthRequest, Response
 pub async fn authentication_challenge<IO>(
     scram_server: ScramServer<DefaultAuthenticationProvider>,
     stream: &mut IO,
-) -> AuthenticationStatus
+) -> (AuthenticationStatus, Option<String>)
 where
     IO: AsyncWrite + AsyncRead + Unpin,
 {
@@ -77,13 +77,15 @@ where
                     .write_all(&bson::to_vec(&response).unwrap())
                     .await
                     .unwrap();
-                return AuthenticationStatus::NotAuthenticated;
+                return (AuthenticationStatus::NotAuthenticated, None);
             }
         };
 
     let scram_first = scram_server.handle_client_first(&client_first).unwrap();
 
     let (scram_server, server_first) = scram_first.server_first();
+
+    let username = scram_server.authcid;
 
     stream.write_all(server_first.as_bytes()).await.unwrap();
 
@@ -95,7 +97,10 @@ where
                     .write_all(&bson::to_vec(&response).unwrap())
                     .await
                     .unwrap();
-                return AuthenticationStatus::NotAuthenticated;
+                return (
+                    AuthenticationStatus::NotAuthenticated,
+                    Some(username.to_string()),
+                );
             }
         };
 
@@ -105,5 +110,5 @@ where
 
     stream.write_all(server_final.as_bytes()).await.unwrap();
 
-    status
+    (status, Some(username.to_string()))
 }

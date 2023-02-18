@@ -13,7 +13,7 @@ use rustls_pemfile::{certs, pkcs8_private_keys};
 use tokio_rustls::rustls::{self, Certificate, PrivateKey};
 use tokio_rustls::TlsAcceptor;
 
-use scram::{AuthenticationStatus, ScramServer};
+use rustbase_scram::{AuthenticationStatus, ScramServer};
 
 use super::authentication;
 use crate::config;
@@ -38,7 +38,8 @@ const BUFFER_SIZE: usize = 8 * 1024;
 
 #[async_trait]
 pub trait Wirewave: Send + Sync + 'static {
-    async fn request(&self, request: Request) -> Result<Response, Status>;
+    async fn request(&self, request: Request, username: Option<String>)
+        -> Result<Response, Status>;
 }
 
 pub struct WirewaveServer<T: Wirewave> {
@@ -90,8 +91,8 @@ impl<T: Wirewave> Server<T> {
             tokio::spawn(async move {
                 println!("[Wirewave] incoming connection: {}", addr);
 
-                if self.require_authentication {
-                    let status = authentication_challenge(server, &mut stream).await;
+                let username = if self.require_authentication {
+                    let (status, username) = authentication_challenge(server, &mut stream).await;
 
                     if status != AuthenticationStatus::Authenticated {
                         println!("[Wirewave] authentication failed: {:?}", status);
@@ -99,11 +100,16 @@ impl<T: Wirewave> Server<T> {
 
                         return;
                     }
-                }
+
+                    username
+                } else {
+                    None
+                };
 
                 handle_connection(stream, move |request| {
                     let svc = svc.clone();
-                    async move { svc.inner.0.request(request).await }
+                    let username = username.clone();
+                    async move { svc.inner.0.request(request, username).await }
                 })
                 .await;
             });
@@ -138,8 +144,8 @@ impl<T: Wirewave> Server<T> {
 
                 println!("[Wirewave] incoming connection: {}", addr);
 
-                if self.require_authentication {
-                    let status = authentication_challenge(server, &mut stream).await;
+                let username = if self.require_authentication {
+                    let (status, username) = authentication_challenge(server, &mut stream).await;
 
                     if status != AuthenticationStatus::Authenticated {
                         println!("[Wirewave] authentication failed: {:?}", status);
@@ -147,11 +153,16 @@ impl<T: Wirewave> Server<T> {
 
                         return;
                     }
-                }
+
+                    username
+                } else {
+                    None
+                };
 
                 handle_connection(stream, move |request| {
                     let svc = svc.clone();
-                    async move { svc.inner.0.request(request).await }
+                    let username = username.clone();
+                    async move { svc.inner.0.request(request, username).await }
                 })
                 .await;
             });
@@ -190,14 +201,15 @@ pub struct Response {
 pub enum Status {
     Ok,
     Error,
-    DatabaseNotFound,
-    KeyNotExists,
-    KeyAlreadyExists,
+    NotFound,
+    AlreadyExists,
     SyntaxError,
     InvalidQuery,
     InvalidBody,
     InvalidBson,
     InvalidAuth,
+    NotAuthorized,
+    Reserved,
 }
 
 // if is ok, return request else return response and send to client
@@ -226,6 +238,8 @@ where
 
     while let Ok(n) = socket.read(buffer).await {
         if n == 0 {
+            socket.shutdown().await.ok();
+            socket.flush().await.ok();
             break;
         }
 
@@ -249,6 +263,10 @@ where
 
     loop {
         let request_bytes = read_socket(&mut socket, &mut buffer).await.unwrap();
+
+        if request_bytes.is_empty() {
+            break;
+        }
 
         match process_request(&request_bytes[..]) {
             Ok(request) => {
