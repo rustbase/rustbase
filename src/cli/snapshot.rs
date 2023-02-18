@@ -14,5 +14,5 @@ pub fn restore_snapshot(path: String, db: String) {
     let snapshot = Snapshot::load_snapshot(snapshot_path.to_path_buf());
 
     Lsm::load_snapshot(db_path, snapshot);
-    println!("[Restore] Done.");
+    println!("[Snapshot] Done.");
 }
