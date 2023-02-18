@@ -894,7 +894,7 @@ dependencies = [
 
 [[package]]
 name = "rustbase"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "bson",

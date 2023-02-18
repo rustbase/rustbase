@@ -1,2 +1,4 @@
 [env]
-VERSION_CODE = "Nabla" # version 0.1.x-beta to - present
+# Nabla - version 0.1.x-beta to - v0.4.0
+
+VERSION_CODE = "Sigma" # v0.5.0 to - present
