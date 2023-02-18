@@ -1,4 +1,4 @@
-mod restore;
+mod snapshot;
 
 use std::process;
 
@@ -13,7 +13,7 @@ pub fn run_subcommands(subcommands: Option<SubCommand>) {
 
     match subcommands {
         SubCommand::Restore { path, db } => {
-            restore::restore_snapshot(path, db);
+            snapshot::restore_snapshot(path, db);
         }
     }
 
