@@ -29,13 +29,19 @@ pub enum SubCommand {
         #[clap(short, long)]
         db: String,
     },
+
+    Upgrade {
+        /// The version to upgrade to
+        #[clap(short, long)]
+        version: Option<String>,
+    },
 }
 
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
 
-    cli::run_subcommands(args.sub_commands);
+    cli::run_subcommands(args.sub_commands).await;
 
     set_title("Rustbase Database Server");
 
