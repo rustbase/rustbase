@@ -196,7 +196,6 @@ dependencies = [
  "js-sys",
  "num-integer",
  "num-traits",
- "serde",
  "time 0.1.45",
  "wasm-bindgen",
  "winapi",
@@ -1394,7 +1393,6 @@ version = "0.5.0"
 dependencies = [
  "async-trait",
  "bson",
- "chrono",
  "clap",
  "colored",
  "ctrlc",
