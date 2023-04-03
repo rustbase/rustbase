@@ -11,14 +11,21 @@ use clap::{clap_derive, Parser};
 
 extern crate dustdata;
 
-#[derive(clap_derive::Parser)]
+#[derive(clap_derive::Parser, Clone)]
 #[clap(author, about, long_about = None)]
-struct Args {
+pub struct Args {
+    /// The path to the configuration file
+    /// If not specified, the default configuration file will be used
+    /// The default configuration file is located at ~/rustbase/bin/rustbaseconf.json
+    /// If the default configuration file does not exist, it will be created
+    #[clap(short, long)]
+    config: Option<std::path::PathBuf>,
+
     #[clap(subcommand)]
     sub_commands: Option<SubCommand>,
 }
 
-#[derive(clap_derive::Subcommand)]
+#[derive(clap_derive::Subcommand, Clone)]
 pub enum SubCommand {
     Restore {
         /// The path to the snapshot file
@@ -41,20 +48,20 @@ pub enum SubCommand {
 async fn main() {
     let args = Args::parse();
 
-    cli::run_subcommands(args.sub_commands).await;
+    cli::run_subcommands(args.clone().sub_commands).await;
 
     set_title("Rustbase Database Server");
 
     println!();
     println!("{}", "Welcome to Rustbase Database Server!".bold());
     println!(
-        "Current version: {} (v{})",
-        env!("VERSION_CODE").green(),
-        env!("CARGO_PKG_VERSION").cyan()
+        "Current version: {} ({})",
+        env!("VERSION_CODE").blue(),
+        format!("v{}", env!("CARGO_PKG_VERSION")).cyan()
     );
     println!();
 
-    let config = config::load_configuration();
+    let config = config::load_configuration(Some(args));
 
     server::initalize_server(config).await;
 }

@@ -77,7 +77,7 @@ impl DustDataInterface {
 
         if !routers.contains_key(&self.current_database) {
             let dd = route::create_dustdata(
-                &Path::new(&self.config.database.path).join(self.current_database.clone()),
+                &Path::new(&self.config.storage.path).join(self.current_database.clone()),
             );
 
             routers.insert(self.current_database.clone(), dd);
@@ -258,7 +258,7 @@ impl DustDataInterface {
 
             // using thread to delete database because it's a blocking operation
             let c_db = database.clone();
-            let c_path = self.config.database.path.clone();
+            let c_path = self.config.storage.path.clone();
             std::thread::spawn(move || {
                 route::remove_dustdata(&c_path, c_db);
             });

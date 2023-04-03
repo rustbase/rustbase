@@ -82,10 +82,10 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
     let config = Arc::new(config);
     let addr = format!("{}:{}", config.net.host, config.net.port);
 
-    let path = Path::new(&config.database.path);
+    let path = Path::new(&config.storage.path);
 
     let routers = route::initialize_dustdata(path);
-    let cache = Arc::new(RwLock::new(Cache::new(config.database.cache_size)));
+    let cache = Arc::new(RwLock::new(Cache::new(config.cache_size)));
 
     let system_db = Arc::new(RwLock::new(DustData::new(default_dustdata_config(
         &path.join("_default"),
@@ -110,7 +110,7 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
     .expect("Error setting Ctrl-C handler");
 
     let pool = ThreadPoolBuilder::new()
-        .num_threads(config.database.threads)
+        .num_threads(config.threads)
         .build()
         .unwrap();
 
@@ -135,7 +135,7 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
 
     let server = Server::new(svc, system_db, use_auth);
 
-    if let Some(tls) = &config.tls {
+    if let Some(tls) = &config.net.tls {
         server.serve_tls(addr, tls).await;
     } else {
         server.serve(addr).await;
