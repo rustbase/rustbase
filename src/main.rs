@@ -74,5 +74,7 @@ async fn main() {
 
     let config = config::load_configuration();
 
+    println!("[Config] loaded config {}", config);
+
     server::initalize_server(config).await;
 }

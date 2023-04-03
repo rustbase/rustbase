@@ -59,8 +59,6 @@ pub fn load_configuration() -> schema::RustbaseConfig {
             panic!("{} not found", config_path.absolutize().unwrap().display());
         }
 
-        println!("[Config] load config: {}", config);
-
         return config;
     }
 
@@ -103,7 +101,6 @@ pub fn load_configuration() -> schema::RustbaseConfig {
         "[Config] {} loaded",
         config_path.file_name().unwrap().to_str().unwrap().cyan()
     );
-    println!("[Config] load config: {}", config);
 
     config
 }
