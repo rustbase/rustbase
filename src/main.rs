@@ -27,6 +27,20 @@ pub struct Args {
 
 #[derive(clap_derive::Subcommand, Clone)]
 pub enum SubCommand {
+    Snapshot {
+        #[clap(subcommand)]
+        sub_command: SnapshotSubCommand,
+    },
+
+    Upgrade {
+        /// The version to upgrade to
+        #[clap(short, long)]
+        version: Option<String>,
+    },
+}
+
+#[derive(clap_derive::Subcommand, Clone)]
+pub enum SnapshotSubCommand {
     Restore {
         /// The path to the snapshot file
         #[clap(short, long)]
@@ -37,10 +51,14 @@ pub enum SubCommand {
         db: String,
     },
 
-    Upgrade {
-        /// The version to upgrade to
+    Create {
+        /// The name of the database to create a snapshot of
         #[clap(short, long)]
-        version: Option<String>,
+        db: String,
+
+        /// The path to save the snapshot file to
+        #[clap(short, long)]
+        path: String,
     },
 }
 

@@ -13,8 +13,8 @@ pub async fn run_subcommands(subcommands: Option<SubCommand>) {
     let subcommands = subcommands.unwrap();
 
     match subcommands {
-        SubCommand::Restore { path, db } => {
-            snapshot::restore_snapshot(path, db);
+        SubCommand::Snapshot { sub_command } => {
+            snapshot::run_snapshots_subcommands(sub_command);
         }
 
         SubCommand::Upgrade { version } => upgrade::upgrade_rustbase(version).await,

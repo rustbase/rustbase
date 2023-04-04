@@ -8,8 +8,8 @@ else
     echo "Building only for $only_target"
 fi
 
-targets=("x86_64-unknown-linux-gnu" "i686-unknown-linux-gnu" "x86_64-pc-windows-gnu" "i686-pc-windows-gnu")
-short_targets=("linux-x64" "linux-x86" "windows-x64" "windows-x86")
+targets=("x86_64-unknown-linux-gnu" "i686-unknown-linux-gnu" "x86_64-pc-windows-gnu" "i686-pc-windows-gnu" "x86_64-apple-darwin" "i686-apple-darwin" "aarch64-apple-darwin")
+short_targets=("linux-x64" "linux-x86" "windows-x64" "windows-x86" "macos-x64" "macos-x86" "macos-arm64")
 
 for t in "${!targets[@]}"; do
     short=${short_targets[$t]}
