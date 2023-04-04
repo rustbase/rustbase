@@ -4,7 +4,6 @@ use dustdata::Error as DustDataError;
 use rand::Rng;
 use rustbase_scram::hash_password;
 use std::collections::HashMap;
-use std::path::Path;
 use std::sync::{Arc, RwLock};
 
 use crate::config;
@@ -76,9 +75,7 @@ impl DustDataInterface {
         let mut routers = self.routers.write().unwrap();
 
         if !routers.contains_key(&self.current_database) {
-            let dd = route::create_dustdata(
-                &Path::new(&self.config.storage.path).join(self.current_database.clone()),
-            );
+            let dd = route::create_dustdata(&self.config, Some(&self.current_database));
 
             routers.insert(self.current_database.clone(), dd);
             println!("[Engine] created database {}", self.current_database);

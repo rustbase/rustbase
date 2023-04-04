@@ -4,7 +4,6 @@ use dustdata::{DustData, DustDataConfig, LsmConfig, Size};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
 use std::collections::HashMap;
-use std::path::Path;
 use std::sync::{Arc, RwLock};
 
 use super::cache;
@@ -82,13 +81,12 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
     let config = Arc::new(config);
     let addr = format!("{}:{}", config.net.host, config.net.port);
 
-    let path = Path::new(&config.storage.path);
-
-    let routers = route::initialize_dustdata(path);
+    let routers = route::initialize_dustdata(&config);
     let cache = Arc::new(RwLock::new(Cache::new(config.cache_size)));
 
     let system_db = Arc::new(RwLock::new(DustData::new(default_dustdata_config(
-        &path.join("_default"),
+        &config,
+        Some("_default"),
     ))));
 
     let c_routers = routers.clone();
@@ -142,11 +140,26 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
     }
 }
 
-pub fn default_dustdata_config(data_path: &Path) -> DustDataConfig {
+pub fn default_dustdata_config(
+    config: &schema::RustbaseConfig,
+    database: Option<&str>,
+) -> DustDataConfig {
+    let flush_threshold = if let Some(dustdata) = &config.storage.dustdata {
+        dustdata.flush_threshold
+    } else {
+        24 * 1024 * 1024 // 24MB
+    };
+
+    let path = if let Some(database) = database {
+        config.storage.path.to_path_buf().join(database)
+    } else {
+        config.storage.path.to_path_buf()
+    };
+
     DustDataConfig {
-        path: data_path.to_path_buf(),
+        path,
         lsm_config: LsmConfig {
-            flush_threshold: Size::Megabytes(256),
+            flush_threshold: Size::Bytes(flush_threshold),
         },
     }
 }
