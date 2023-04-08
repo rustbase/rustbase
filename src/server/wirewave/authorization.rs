@@ -8,24 +8,29 @@ pub enum UserPermission {
     Admin,
 }
 
+#[derive(Debug)]
+pub enum UserPermissionError {
+    UnknownPermission,
+}
+
 impl UserPermission {
-    pub fn from_str(s: &str) -> Option<UserPermission> {
+    pub fn from_str(s: &str) -> Result<UserPermission, UserPermissionError> {
         match s {
-            "read" => Some(UserPermission::Read),
-            "write" => Some(UserPermission::Write),
-            "read_and_write" => Some(UserPermission::ReadAndWrite),
-            "admin" => Some(UserPermission::Admin),
-            _ => None,
+            "read" => Ok(UserPermission::Read),
+            "write" => Ok(UserPermission::Write),
+            "read_and_write" => Ok(UserPermission::ReadAndWrite),
+            "admin" => Ok(UserPermission::Admin),
+            _ => Err(UserPermissionError::UnknownPermission),
         }
     }
 
-    pub fn from_i32(i: i32) -> Option<UserPermission> {
+    pub fn from_i32(i: i32) -> Result<UserPermission, UserPermissionError> {
         match i {
-            0 => Some(UserPermission::Read),
-            1 => Some(UserPermission::Write),
-            2 => Some(UserPermission::ReadAndWrite),
-            3 => Some(UserPermission::Admin),
-            _ => None,
+            0 => Ok(UserPermission::Read),
+            1 => Ok(UserPermission::Write),
+            2 => Ok(UserPermission::ReadAndWrite),
+            3 => Ok(UserPermission::Admin),
+            _ => Err(UserPermissionError::UnknownPermission),
         }
     }
 

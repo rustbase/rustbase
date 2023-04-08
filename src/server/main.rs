@@ -18,7 +18,7 @@ use cache::Cache;
 use config::schema;
 use engine::core::Core;
 use server::route;
-use wirewave::server::{Request, Response, Server, Status, Wirewave, WirewaveServer};
+use wirewave::server::{Error, Request, Response, Server, Status, Wirewave, WirewaveServer};
 
 pub struct Database {
     pool: ThreadPool,
@@ -30,19 +30,27 @@ pub struct Database {
 
 #[async_trait]
 impl Wirewave for Database {
-    async fn request(
-        &self,
-        request: Request,
-        username: Option<String>,
-    ) -> Result<Response, Status> {
+    async fn request(&self, request: Request, username: Option<String>) -> Result<Response, Error> {
         let body = request.body;
 
         if body.is_empty() {
-            return Err(Status::InvalidBody);
+            let error = Error {
+                message: "Empty body".to_string(),
+                query_message: None,
+                status: Status::InvalidBody,
+            };
+
+            return Err(error);
         }
 
         if !body.contains_key("query") || !body.contains_key("database") {
-            return Err(Status::InvalidBody);
+            let error = Error {
+                message: "Missing query or database".to_string(),
+                query_message: None,
+                status: Status::InvalidBody,
+            };
+
+            return Err(error);
         }
 
         let database = body.get_str("database").unwrap();
@@ -50,11 +58,27 @@ impl Wirewave for Database {
 
         self.pool
             .install(move || match query::parser::parse(query) {
-                Err(e) => Ok(Response {
-                    message: Some(e.1),
-                    status: Status::SyntaxError,
-                    body: None,
-                }),
+                Err(e) => match e.0 {
+                    query::QueryErrorType::SyntaxError => {
+                        let error = Error {
+                            message: e.1,
+                            query_message: None,
+                            status: Status::SyntaxError,
+                        };
+
+                        Err(error)
+                    }
+
+                    query::QueryErrorType::UnexpectedToken => {
+                        let error = Error {
+                            message: e.1,
+                            query_message: None,
+                            status: Status::InvalidQuery,
+                        };
+
+                        Err(error)
+                    }
+                },
 
                 Ok(query) => {
                     let mut core = Core::new(

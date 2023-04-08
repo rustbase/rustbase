@@ -14,7 +14,7 @@ use server::wirewave;
 use cache::Cache;
 use query::parser::{ASTNode, Keywords, Verbs};
 use wirewave::authorization::UserPermission;
-use wirewave::server::{Response, Status};
+use wirewave::server::{Error, Response, Status};
 
 use interface::TransactionError;
 
@@ -54,7 +54,7 @@ impl Core {
     /// Returns:
     ///
     /// A Result<Response, Status>
-    pub fn run_ast(&mut self, ast: ASTNode) -> Result<Response, Status> {
+    pub fn run_ast(&mut self, ast: ASTNode) -> Result<Response, Error> {
         match ast {
             ASTNode::IntoExpression {
                 keyword,
@@ -69,7 +69,15 @@ impl Core {
             } => self.monadic_expr(keyword, verb, expr),
 
             ASTNode::SingleExpression { keyword, ident } => self.sgl_expr(keyword, ident),
-            _ => Err(Status::SyntaxError),
+            _ => {
+                let error = Error {
+                    message: "Invalid query".to_string(),
+                    query_message: None,
+                    status: Status::InvalidQuery,
+                };
+
+                Err(error)
+            }
         }
     }
 
@@ -90,13 +98,21 @@ impl Core {
         keyword: Keywords,
         value: ASTNode,
         expr: ASTNode,
-    ) -> Result<Response, Status> {
+    ) -> Result<Response, Error> {
         match keyword {
             Keywords::Insert => self.ast_into_insert(value, expr),
 
             Keywords::Update => self.ast_into_update(value, expr),
 
-            _ => Err(Status::InvalidQuery),
+            _ => {
+                let error = Error {
+                    message: format!("{:?} is unexpected for into expression", keyword),
+                    query_message: None,
+                    status: Status::InvalidQuery,
+                };
+
+                Err(error)
+            }
         }
     }
 
@@ -117,12 +133,20 @@ impl Core {
         keyword: Keywords,
         verb: Verbs,
         expr: Option<Vec<ASTNode>>,
-    ) -> Result<Response, Status> {
+    ) -> Result<Response, Error> {
         match keyword {
             Keywords::Insert => match verb {
                 Verbs::User => self.ast_user_insert(expr),
 
-                _ => Err(Status::InvalidQuery),
+                _ => {
+                    let error = Error {
+                        message: format!("{:?} is unexpected for insert expression", verb),
+                        query_message: None,
+                        status: Status::InvalidQuery,
+                    };
+
+                    Err(error)
+                }
             },
 
             Keywords::Delete => match verb {
@@ -134,10 +158,26 @@ impl Core {
             Keywords::Update => match verb {
                 Verbs::User => self.ast_user_update(expr),
 
-                _ => Err(Status::InvalidQuery),
+                _ => {
+                    let error = Error {
+                        message: format!("{:?} is unexpected for update expression", verb),
+                        query_message: None,
+                        status: Status::InvalidQuery,
+                    };
+
+                    Err(error)
+                }
             },
 
-            _ => Err(Status::InvalidQuery),
+            _ => {
+                let error = Error {
+                    message: format!("{:?} is unexpected for monadic expression", keyword),
+                    query_message: None,
+                    status: Status::InvalidQuery,
+                };
+
+                Err(error)
+            }
         }
     }
 
@@ -155,7 +195,7 @@ impl Core {
         &mut self,
         keyword: Keywords,
         ident: Option<Box<ASTNode>>,
-    ) -> Result<Response, Status> {
+    ) -> Result<Response, Error> {
         match keyword {
             Keywords::Get => self.ast_sgl_get(ident),
 
@@ -163,7 +203,15 @@ impl Core {
 
             Keywords::List => self.ast_sgl_list(),
 
-            _ => Err(Status::InvalidQuery),
+            _ => {
+                let error = Error {
+                    message: format!("{:?} is unexpected for single expression", keyword),
+                    query_message: None,
+                    status: Status::InvalidQuery,
+                };
+
+                Err(error)
+            }
         }
     }
 
@@ -177,21 +225,22 @@ impl Core {
     /// Returns:
     ///
     /// A response object.
-    fn ast_into_insert(&mut self, value: ASTNode, expr: ASTNode) -> Result<Response, Status> {
+    fn ast_into_insert(&mut self, value: ASTNode, expr: ASTNode) -> Result<Response, Error> {
         let key = match expr {
             ASTNode::Identifier(ident) => ident,
-            _ => return syntax_error("key must be an identifier"),
+            _ => return query_error("key must be an identifier"),
         };
 
         let value = match value {
             ASTNode::Bson(json) => json,
-            _ => return syntax_error("value must be a json object"),
+            _ => return query_error("value must be a json object"),
         };
 
         match self.interface.insert_into_dustdata(key, value) {
             Ok(_) => Ok(Response {
                 message: None,
                 status: Status::Ok,
+                is_error: false,
                 body: None,
             }),
 
@@ -199,7 +248,7 @@ impl Core {
         }
     }
 
-    /// It takes an ASTNode and an ASTNode, and returns a Result<Response, Status>
+    /// It takes an ASTNode and an ASTNode, and returns a Result<Response, Error>
     ///
     /// Arguments:
     ///
@@ -209,20 +258,21 @@ impl Core {
     /// Returns:
     ///
     /// A response object.
-    fn ast_into_update(&mut self, value: ASTNode, expr: ASTNode) -> Result<Response, Status> {
+    fn ast_into_update(&mut self, value: ASTNode, expr: ASTNode) -> Result<Response, Error> {
         let key = match expr {
             ASTNode::Identifier(ident) => ident,
-            _ => return syntax_error("key must be an identifier"),
+            _ => return query_error("key must be an identifier"),
         };
 
         let value = match value {
             ASTNode::Bson(json) => json,
-            _ => return syntax_error("value must be a json object"),
+            _ => return query_error("value must be a json object"),
         };
 
         match self.interface.update_dustdata(key, value) {
             Ok(_) => Ok(Response {
                 message: None,
+                is_error: false,
                 status: Status::Ok,
                 body: None,
             }),
@@ -231,7 +281,7 @@ impl Core {
         }
     }
 
-    /// It takes a `Vec<ASTNode>` and returns a `Result<Response, Status>`
+    /// It takes a `Vec<ASTNode>` and returns a `Result<Response, Error>`
     ///
     /// Arguments:
     ///
@@ -240,9 +290,9 @@ impl Core {
     /// Returns:
     ///
     /// A response object
-    fn ast_user_insert(&mut self, expr: Option<Vec<ASTNode>>) -> Result<Response, Status> {
+    fn ast_user_insert(&mut self, expr: Option<Vec<ASTNode>>) -> Result<Response, Error> {
         if expr.is_none() {
-            return Err(Status::InvalidQuery);
+            return query_error("user insert must have an expression");
         }
 
         let expr = expr.unwrap();
@@ -266,12 +316,12 @@ impl Core {
                                     if let Some(s) = s {
                                         s.to_string()
                                     } else {
-                                        return syntax_error("password must be a string");
+                                        return query_error("password must be a string");
                                     }
                                 }
 
                                 _ => {
-                                    return syntax_error("password must be a string");
+                                    return query_error("password must be a string");
                                 }
                             }
                         }
@@ -285,11 +335,11 @@ impl Core {
                                     if let Some(s) = s {
                                         s.to_string()
                                     } else {
-                                        return syntax_error("permission must be a string");
+                                        return query_error("permission must be a string");
                                     }
                                 }
                                 _ => {
-                                    return syntax_error("permission must be a string");
+                                    return query_error("permission must be a string");
                                 }
                             }
                         }
@@ -305,13 +355,13 @@ impl Core {
         }
 
         if username.is_empty() || password.is_empty() || permission.is_empty() {
-            return syntax_error("username, password, and permission are required");
+            return query_error("username, password, and permission are required");
         }
 
         let permission = UserPermission::from_str(permission.as_str());
 
-        if permission.is_none() {
-            return syntax_error(
+        if permission.is_err() {
+            return query_error(
                 "permission must be 'read' or 'write', 'read_and_write', or 'admin'",
             );
         }
@@ -322,6 +372,7 @@ impl Core {
         {
             Ok(_) => Ok(Response {
                 message: None,
+                is_error: false,
                 status: Status::Ok,
                 body: None,
             }),
@@ -340,21 +391,22 @@ impl Core {
     /// Returns:
     ///
     /// A `Result` type.
-    fn ast_user_delete(&mut self, expr: Option<Vec<ASTNode>>) -> Result<Response, Status> {
+    fn ast_user_delete(&mut self, expr: Option<Vec<ASTNode>>) -> Result<Response, Error> {
         let user = if let Some(expr) = expr {
             match expr[0] {
                 ASTNode::Identifier(ref ident) => ident.clone(),
                 _ => {
-                    unreachable!()
+                    return query_error("user delete must have an expression");
                 }
             }
         } else {
-            return Err(Status::SyntaxError);
+            return query_error("user delete must have an expression");
         };
 
         match self.interface.delete_user(user) {
             Ok(_) => Ok(Response {
                 message: None,
+                is_error: false,
                 status: Status::Ok,
                 body: None,
             }),
@@ -375,9 +427,9 @@ impl Core {
     /// Returns:
     ///
     /// A response object.
-    fn ast_user_update(&mut self, expr: Option<Vec<ASTNode>>) -> Result<Response, Status> {
+    fn ast_user_update(&mut self, expr: Option<Vec<ASTNode>>) -> Result<Response, Error> {
         if expr.is_none() {
-            return Err(Status::InvalidQuery);
+            return query_error("user update must have an expression");
         }
 
         let mut password: Option<String> = None;
@@ -398,7 +450,7 @@ impl Core {
                                     if let Some(s) = s {
                                         Some(s.to_string())
                                     } else {
-                                        return syntax_error("password must be a string");
+                                        return query_error("password must be a string");
                                     }
                                 }
                                 _ => None,
@@ -414,7 +466,7 @@ impl Core {
                                     if let Some(s) = s {
                                         Some(s.to_string())
                                     } else {
-                                        return syntax_error("permission must be a string");
+                                        return query_error("permission must be a string");
                                     }
                                 }
                                 _ => None,
@@ -431,8 +483,15 @@ impl Core {
             }
         }
 
-        let permission: Option<UserPermission> = if let Some(permission) = permission {
-            UserPermission::from_str(permission.as_str())
+        let permission = if let Some(permission) = permission {
+            let permission = UserPermission::from_str(permission.as_str());
+            if permission.is_err() {
+                return query_error(
+                    "permission must be 'read' or 'write', 'read_and_write', or 'admin'",
+                );
+            };
+
+            Some(permission.unwrap())
         } else {
             None
         };
@@ -440,6 +499,7 @@ impl Core {
         match self.interface.update_user(username, password, permission) {
             Ok(_) => Ok(Response {
                 message: None,
+                is_error: false,
                 status: Status::Ok,
                 body: None,
             }),
@@ -457,7 +517,7 @@ impl Core {
     /// Returns:
     ///
     /// A response object.
-    fn ast_database_delete(&mut self, expr: Option<Vec<ASTNode>>) -> Result<Response, Status> {
+    fn ast_database_delete(&mut self, expr: Option<Vec<ASTNode>>) -> Result<Response, Error> {
         let database = if let Some(expr) = expr {
             match expr[0] {
                 ASTNode::Identifier(ref ident) => ident.clone(),
@@ -472,6 +532,7 @@ impl Core {
         match self.interface.delete_database(database) {
             Ok(_) => Ok(Response {
                 message: None,
+                is_error: false,
                 status: Status::Ok,
                 body: None,
             }),
@@ -489,9 +550,9 @@ impl Core {
     /// Returns:
     ///
     /// A `Result` type.
-    fn ast_sgl_get(&mut self, ident: Option<Box<ASTNode>>) -> Result<Response, Status> {
+    fn ast_sgl_get(&mut self, ident: Option<Box<ASTNode>>) -> Result<Response, Error> {
         if ident.is_none() {
-            return Err(Status::InvalidQuery);
+            return query_error("get must have an expression");
         }
 
         let key = match *ident.unwrap() {
@@ -504,6 +565,7 @@ impl Core {
         match self.interface.get_from_dustdata(key) {
             Ok(value) => Ok(Response {
                 message: None,
+                is_error: false,
                 status: Status::Ok,
                 body: Some(value),
             }),
@@ -521,7 +583,7 @@ impl Core {
     /// Returns:
     ///
     /// A response object.
-    fn ast_sgl_delete(&mut self, ident: Option<Box<ASTNode>>) -> Result<Response, Status> {
+    fn ast_sgl_delete(&mut self, ident: Option<Box<ASTNode>>) -> Result<Response, Error> {
         let key = match *ident.unwrap() {
             ASTNode::Identifier(ident) => ident,
             _ => {
@@ -532,6 +594,7 @@ impl Core {
         match self.interface.delete_from_dustdata(key) {
             Ok(_) => Ok(Response {
                 message: None,
+                is_error: false,
                 status: Status::Ok,
                 body: None,
             }),
@@ -552,10 +615,11 @@ impl Core {
     /// Returns:
     ///
     /// A `Response` object.
-    fn ast_sgl_list(&mut self) -> Result<Response, Status> {
+    fn ast_sgl_list(&mut self) -> Result<Response, Error> {
         match self.interface.list_from_dustdata() {
             Ok(keys) => Ok(Response {
                 message: None,
+                is_error: false,
                 status: Status::Ok,
                 body: Some(Bson::Array(keys.into_iter().map(Bson::String).collect())),
             }),
@@ -565,21 +629,21 @@ impl Core {
     }
 
     // error
-    fn dd_error(&self, error: TransactionError) -> Result<Response, Status> {
+    fn dd_error(&self, error: TransactionError) -> Result<Response, Error> {
         match error {
             TransactionError::InternalError(e) => {
                 let code = parse_dd_error_code(e.code);
 
-                Ok(Response {
-                    message: Some(code.1),
+                Err(Error {
+                    message: code.1,
                     status: code.0,
-                    body: None,
+                    query_message: None,
                 })
             }
-            TransactionError::ExternalError(e, message) => Ok(Response {
-                message: Some(message),
+            TransactionError::ExternalError(e, message) => Err(Error {
+                message,
                 status: e,
-                body: None,
+                query_message: None,
             }),
         }
     }
@@ -593,10 +657,10 @@ fn parse_dd_error_code(code: dustdata::ErrorCode) -> (Status, String) {
     }
 }
 
-fn syntax_error(msg: &str) -> Result<Response, Status> {
-    Ok(Response {
-        message: Some(msg.to_string()),
-        status: Status::SyntaxError,
-        body: None,
+fn query_error(msg: &str) -> Result<Response, Error> {
+    Err(Error {
+        message: msg.to_string(),
+        status: Status::InvalidQuery,
+        query_message: None,
     })
 }

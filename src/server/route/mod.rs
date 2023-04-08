@@ -14,7 +14,7 @@ pub fn get_existing_routes(data_path: &Path) -> Vec<String> {
     let mut routes = Vec::new();
 
     if !path::Path::new(&data_path).exists() {
-        fs::create_dir_all(&data_path).unwrap();
+        fs::create_dir_all(data_path).unwrap();
         return routes;
     }
 

@@ -1,5 +1,7 @@
 /target
 
+# MacOS
+.DS_Store
 
 # Database files
 *.db

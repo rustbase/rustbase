@@ -47,7 +47,8 @@ fn process_authentication_request(buffer: &[u8]) -> Result<AuthRequest, Response
         Ok(request) => request,
         Err(e) => {
             let response = Response {
-                message: Some(e.to_string()),
+                message: Some(vec![e.to_string()]),
+                is_error: true,
                 status: Status::Error,
                 body: None,
             };

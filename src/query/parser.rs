@@ -114,7 +114,7 @@ fn build_expr(pair: Pair<Rule>) -> Result<ASTNode> {
                     "update" => Keywords::Update,
                     _ => {
                         return Err(QueryError(
-                            QueryErrorType::SyntaxError,
+                            QueryErrorType::UnexpectedToken,
                             "invalid keyword".to_string(),
                         ))
                     }
@@ -124,7 +124,7 @@ fn build_expr(pair: Pair<Rule>) -> Result<ASTNode> {
                     "database" => Verbs::Database,
                     _ => {
                         return Err(QueryError(
-                            QueryErrorType::SyntaxError,
+                            QueryErrorType::UnexpectedToken,
                             "invalid verb".to_string(),
                         ))
                     }
@@ -145,7 +145,7 @@ fn build_expr(pair: Pair<Rule>) -> Result<ASTNode> {
                     "update" => Keywords::Update,
                     _ => {
                         return Err(QueryError(
-                            QueryErrorType::SyntaxError,
+                            QueryErrorType::UnexpectedToken,
                             "invalid keyword".to_string(),
                         ))
                     }
@@ -167,7 +167,7 @@ fn build_expr(pair: Pair<Rule>) -> Result<ASTNode> {
                     "list" => Keywords::List,
                     _ => {
                         return Err(QueryError(
-                            QueryErrorType::SyntaxError,
+                            QueryErrorType::UnexpectedToken,
                             "invalid keyword".to_string(),
                         ))
                     }

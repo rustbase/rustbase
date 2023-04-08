@@ -38,8 +38,7 @@ const BUFFER_SIZE: usize = 8 * 1024;
 
 #[async_trait]
 pub trait Wirewave: Send + Sync + 'static {
-    async fn request(&self, request: Request, username: Option<String>)
-        -> Result<Response, Status>;
+    async fn request(&self, request: Request, username: Option<String>) -> Result<Response, Error>;
 }
 
 pub struct WirewaveServer<T: Wirewave> {
@@ -192,9 +191,17 @@ pub struct Request {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Response {
-    pub message: Option<String>,
+    pub message: Option<Vec<String>>,
+    pub is_error: bool,
     pub status: Status,
     pub body: Option<bson::Bson>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Error {
+    pub message: String,
+    pub query_message: Option<String>,
+    pub status: Status,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -218,7 +225,8 @@ fn process_request(buf: &[u8]) -> Result<Request, Response> {
         Ok(request) => request,
         Err(e) => {
             let response = Response {
-                message: Some(e.to_string()),
+                is_error: true,
+                message: Some(vec![e.to_string()]),
                 status: Status::InvalidBson,
                 body: None,
             };
@@ -256,7 +264,7 @@ where
 async fn handle_connection<F, Fut, IO>(mut socket: IO, callback: F)
 where
     F: Fn(Request) -> Fut,
-    Fut: Future<Output = Result<Response, Status>>,
+    Fut: Future<Output = Result<Response, Error>>,
     IO: AsyncRead + AsyncWrite + Unpin,
 {
     let mut buffer = vec![0; BUFFER_SIZE];
@@ -272,10 +280,11 @@ where
             Ok(request) => {
                 let response = match callback(request).await {
                     Ok(response) => response,
-                    Err(status) => Response {
-                        message: None,
-                        status,
+                    Err(error) => Response {
                         body: None,
+                        is_error: true,
+                        message: Some(vec![error.message, error.query_message.unwrap_or_default()]),
+                        status: error.status,
                     },
                 };
 
