@@ -27,11 +27,13 @@ pub struct Args {
 
 #[derive(clap_derive::Subcommand, Clone)]
 pub enum SubCommand {
+    /// Manage snapshots
     Snapshot {
         #[clap(subcommand)]
         sub_command: SnapshotSubCommand,
     },
 
+    /// Upgrade the Rustbase server
     Upgrade {
         /// The version to upgrade to
         #[clap(short, long)]
@@ -41,6 +43,7 @@ pub enum SubCommand {
 
 #[derive(clap_derive::Subcommand, Clone)]
 pub enum SnapshotSubCommand {
+    /// Restore a snapshot with given path and database name
     Restore {
         /// The path to the snapshot file
         #[clap(short, long)]
@@ -51,6 +54,7 @@ pub enum SnapshotSubCommand {
         db: String,
     },
 
+    /// Create a snapshot of a database with given name and path
     Create {
         /// The name of the database to create a snapshot of
         #[clap(short, long)]
