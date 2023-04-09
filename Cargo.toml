@@ -27,13 +27,3 @@ rustbase-scram = "0.6.1"
 clap = { version = "4.1.3", features = ["derive"] }
 reqwest = "0.11.12"
 zip = "0.6.4"
-
-[build-dependencies]
-winres = "0.1"
-
-[package.metadata.winres]
-OriginalFilename = "rustbase.exe"
-LegalCopyright = "Rustbase © 2023, The Rustbase Project Developers"
-ProductName = "Rustbase Database"
-ProductVersion = "0.4.0"
-FileDescription = "Rustbase Database Server"
