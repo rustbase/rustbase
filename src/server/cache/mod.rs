@@ -1,118 +1,80 @@
-use std::collections::BTreeMap;
+use std::collections::{HashMap, VecDeque};
 
 #[derive(Clone, Debug)]
 pub struct Cache {
-    cache: BTreeMap<String, CacheNode>,
+    index: HashMap<String, usize>,
+    cache: VecDeque<bson::Bson>,
     cache_size: usize,
     max_size: usize,
-}
-
-#[derive(Clone, Debug)]
-struct CacheNode {
-    value: bson::Bson,
-    size: usize,
-    insert_at: std::time::SystemTime,
 }
 
 impl Cache {
     pub fn new(max_cache_size: usize) -> Self {
         Cache {
-            cache: BTreeMap::new(),
+            index: HashMap::new(),
+            cache: VecDeque::new(),
             cache_size: 0,
             max_size: max_cache_size,
         }
     }
 
     pub fn get(&self, key: &str) -> Option<&bson::Bson> {
-        if !self.cache.contains_key(key) {
+        if !self.index.contains_key(key) {
             return None;
         }
 
-        let value = &self.cache.get(key).unwrap().value;
+        let index = self.index.get(key).unwrap();
+        let value = self.cache.get(*index).unwrap();
         Some(value)
     }
 
     pub fn insert(&mut self, key: String, value: bson::Bson) -> CResult<()> {
-        if self.cache.contains_key(&key) {
+        if self.index.contains_key(&key) {
             return Err(CacheError {
                 code: CacheErrorCode::KeyExists,
             });
         }
         let value_size = std::mem::size_of_val(&value);
 
-        if self.is_cache_full() || self.cache_size + value_size > self.max_size {
-            self.manage_cache(value_size);
+        self.manage_cache(value_size);
 
-            // check again
-            if self.is_cache_full() || self.cache_size + value_size > self.max_size {
-                return Err(CacheError {
-                    code: CacheErrorCode::CacheFull,
-                });
-            }
-        }
+        self.cache.push_back(value);
+        let index = self.cache.len() - 1;
+        self.index.insert(key, index);
 
-        let node = CacheNode {
-            value,
-            size: value_size,
-            insert_at: std::time::SystemTime::now(),
-        };
+        self.cache_size += value_size;
 
-        self.add_size(value_size);
-
-        self.cache.insert(key, node);
         Ok(())
     }
 
     pub fn remove(&mut self, key: &str) -> CResult<()> {
-        if !self.cache.contains_key(key) {
+        if !self.index.contains_key(key) {
             return Err(CacheError {
                 code: CacheErrorCode::KeyNotExists,
             });
         }
 
-        let value = self.cache.remove(key).unwrap();
-        self.remove_size(value.size);
+        let index = self.index.remove(key).unwrap();
+        let value = self.cache.remove(index).unwrap();
+        let value_size = std::mem::size_of_val(&value);
+
+        self.cache_size -= value_size;
 
         Ok(())
     }
 
-    fn is_cache_full(&self) -> bool {
-        if self.cache_size >= self.max_size {
-            println!("[Cache] The cache is full");
-            return true;
-        }
-
-        false
-    }
-
-    fn add_size(&mut self, size: usize) {
-        self.cache_size += size;
-    }
-
-    fn remove_size(&mut self, size: usize) {
-        self.cache_size -= size;
-    }
-
     fn manage_cache(&mut self, size_to_insert: usize) {
-        println!("[Cache] Removing old data");
-        let current_size = self.cache_size;
-        // remove oldest entry with size_to_insert
+        while self.cache_size + size_to_insert > self.max_size {
+            let value = self.cache.pop_front();
 
-        let cache = self.cache.clone();
-        let cache = cache.iter();
+            if value.is_none() {
+                break;
+            }
 
-        let cache = cache.filter(|(_, node)| node.size <= size_to_insert);
-
-        let mut cache = cache.collect::<Vec<(_, _)>>();
-        cache.sort_by(|a, b| a.1.insert_at.cmp(&b.1.insert_at));
-
-        let (key, _) = cache.pop().unwrap();
-        self.remove(key).unwrap();
-
-        println!(
-            "[Cache] {} Bytes has been flushed",
-            current_size - self.cache_size
-        );
+            let value_size = std::mem::size_of_val(&value);
+            println!("[Cache] removing {} bytes", value_size);
+            self.cache_size -= value_size;
+        }
     }
 }
 
@@ -122,7 +84,6 @@ pub type CResult<T> = std::result::Result<T, CacheError>;
 pub enum CacheErrorCode {
     KeyNotExists,
     KeyExists,
-    CacheFull,
 }
 
 #[derive(Debug)]
@@ -134,7 +95,6 @@ impl std::fmt::Display for CacheErrorCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             CacheErrorCode::KeyExists => write!(f, "KeyExists"),
-            CacheErrorCode::CacheFull => write!(f, "CacheFull"),
             CacheErrorCode::KeyNotExists => write!(f, "KeyNotExists"),
         }
     }
