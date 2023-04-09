@@ -10,12 +10,14 @@ fn parse_current_platform() -> String {
     let platform = match os {
         "linux" => "linux",
         "windows" => "windows",
+        "macos" => "macos",
         _ => panic!("Unsupported platform: {}", os),
     };
 
     let arch = match arch {
         "x86_64" => "x64",
         "x86" => "x86",
+        "aarch64" => "arm64",
         _ => panic!("Unsupported architecture: {}", arch),
     };
 
@@ -31,7 +33,7 @@ pub async fn upgrade_rustbase(version: Option<String>) {
 
 async fn get_release(version: String, platform: String) {
     let url = if version == "latest" {
-        format!("{RELEASE_DOWNLOAD_URL}/{version}/download/rustbase-{platform}.zip")
+        format!("{RELEASE_DOWNLOAD_URL}/latest/download/rustbase-{platform}.zip")
     } else {
         format!("{RELEASE_DOWNLOAD_URL}/download/{version}/rustbase-{platform}.zip")
     };

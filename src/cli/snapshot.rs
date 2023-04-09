@@ -16,7 +16,12 @@ fn create_snapshot(db: String, path: String) {
     let snapshot_path = Path::new(&path);
     let config = config::load_configuration(None);
 
-    let db_path = config.storage.path.join(db);
+    let db_path = config.storage.path.join(&db);
+
+    if !db_path.exists() {
+        println!("[Snapshot] Database {} does not exist", db);
+        return;
+    }
 
     let lsm = Lsm::new(LsmConfig {
         flush_threshold: 0,
@@ -33,6 +38,11 @@ fn restore_snapshot(path: String, db: String) {
     let config = config::load_configuration(None);
 
     let db_path = config.storage.path.join(db);
+
+    if !snapshot_path.exists() {
+        println!("[Restore] Snapshot {} does not exist", path);
+        return;
+    }
 
     let snapshot = Snapshot::load_snapshot(snapshot_path.to_path_buf());
 
