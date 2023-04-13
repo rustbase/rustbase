@@ -280,7 +280,7 @@ impl DustDataInterface {
         if let Some(current_user) = &self.current_user {
             if !self.user_has_perm(current_user.clone(), UserPermission::Admin)? {
                 return Err(TransactionError::ExternalError(
-                    Status::Error,
+                    Status::NotAuthorized,
                     "permission.denied".to_string(),
                 ));
             }

@@ -7,7 +7,7 @@ use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use super::server;
 
 use server::read_socket;
-use server::{Response, Status};
+use server::{ResHeader, Response, Status};
 
 #[derive(Clone)]
 pub struct DefaultAuthenticationProvider {
@@ -47,10 +47,12 @@ fn process_authentication_request(buffer: &[u8]) -> Result<AuthRequest, Response
         Ok(request) => request,
         Err(e) => {
             let response = Response {
-                message: Some(vec![e.to_string()]),
-                is_error: true,
-                status: Status::Error,
                 body: None,
+                header: ResHeader {
+                    is_error: true,
+                    status: Status::BadBody,
+                    messages: Some(vec![e.to_string()]),
+                },
             };
 
             return Err(response);

@@ -195,16 +195,38 @@ impl<T: Wirewave> Clone for _Inner<T> {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Request {
-    pub auth: Option<String>,
     pub body: bson::Document,
+    pub header: ReqHeader,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ReqHeader {
+    #[serde(rename = "type")]
+    pub type_: Type,
+    pub auth: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum Type {
+    Query,
+    Ping,
+    PreRequest,
+    Cluster,
+}
+
+// ----
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Response {
-    pub message: Option<Vec<String>>,
-    pub is_error: bool,
-    pub status: Status,
+    pub header: ResHeader,
     pub body: Option<bson::Bson>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ResHeader {
+    pub status: Status,
+    pub messages: Option<Vec<String>>,
+    pub is_error: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -217,16 +239,22 @@ pub struct Error {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Status {
     Ok,
-    Error,
+    Inserted,
+    Updated,
+
+    // ----
+    InvalidQuery,
     NotFound,
     AlreadyExists,
-    SyntaxError,
-    InvalidQuery,
-    InvalidBody,
-    InvalidBson,
-    InvalidAuth,
+    BadBson,
+    BadAuth,
+    BadBody,
     NotAuthorized,
     Reserved,
+    SyntaxError,
+
+    // ----
+    InternalError,
 }
 
 // if is ok, return request else return response and send to client
@@ -235,10 +263,12 @@ fn process_request(buf: &[u8]) -> Result<Request, Response> {
         Ok(request) => request,
         Err(e) => {
             let response = Response {
-                is_error: true,
-                message: Some(vec![e.to_string()]),
-                status: Status::InvalidBson,
                 body: None,
+                header: ResHeader {
+                    status: Status::BadBson,
+                    messages: Some(vec![e.to_string()]),
+                    is_error: true,
+                },
             };
 
             return Err(response);
@@ -288,13 +318,37 @@ where
 
         match process_request(&request_bytes[..]) {
             Ok(request) => {
+                let request = match request.header.type_ {
+                    Type::Ping => {
+                        let response = Response {
+                            body: Some(bson::Bson::Document(request.body)),
+                            header: ResHeader {
+                                status: Status::Ok,
+                                messages: None,
+                                is_error: false,
+                            },
+                        };
+
+                        let response = bson::to_bson(&response).unwrap();
+                        let response = bson::to_vec(&response).unwrap();
+
+                        socket.write_all(&response).await.ok();
+
+                        continue;
+                    }
+
+                    _ => request,
+                };
+
                 let response = match callback(request).await {
                     Ok(response) => response,
                     Err(error) => Response {
                         body: None,
-                        is_error: true,
-                        message: Some(vec![error.message, error.query_message.unwrap_or_default()]),
-                        status: error.status,
+                        header: ResHeader {
+                            status: error.status,
+                            messages: Some(vec![error.message]),
+                            is_error: true,
+                        },
                     },
                 };
 

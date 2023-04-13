@@ -36,7 +36,7 @@ impl Wirewave for Database {
             let error = Error {
                 message: "Empty body".to_string(),
                 query_message: None,
-                status: Status::InvalidBody,
+                status: Status::BadBody,
             };
 
             return Err(error);
@@ -46,7 +46,7 @@ impl Wirewave for Database {
             let error = Error {
                 message: "Missing query or database".to_string(),
                 query_message: None,
-                status: Status::InvalidBody,
+                status: Status::BadBody,
             };
 
             return Err(error);

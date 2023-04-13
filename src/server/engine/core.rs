@@ -6,6 +6,7 @@ use std::sync::{Arc, RwLock};
 use crate::config;
 use crate::query;
 use crate::server;
+use crate::server::wirewave::server::ResHeader;
 
 use config::schema;
 use server::cache;
@@ -238,10 +239,12 @@ impl Core {
 
         match self.interface.insert_into_dustdata(key, value) {
             Ok(_) => Ok(Response {
-                message: None,
-                status: Status::Ok,
-                is_error: false,
                 body: None,
+                header: ResHeader {
+                    is_error: false,
+                    messages: None,
+                    status: Status::Ok,
+                },
             }),
 
             Err(e) => self.dd_error(e),
@@ -271,10 +274,12 @@ impl Core {
 
         match self.interface.update_dustdata(key, value) {
             Ok(_) => Ok(Response {
-                message: None,
-                is_error: false,
-                status: Status::Ok,
                 body: None,
+                header: ResHeader {
+                    is_error: false,
+                    messages: None,
+                    status: Status::Ok,
+                },
             }),
 
             Err(e) => self.dd_error(e),
@@ -371,10 +376,12 @@ impl Core {
             .create_user(username, password, permission.unwrap())
         {
             Ok(_) => Ok(Response {
-                message: None,
-                is_error: false,
-                status: Status::Ok,
                 body: None,
+                header: ResHeader {
+                    is_error: false,
+                    messages: None,
+                    status: Status::Ok,
+                },
             }),
 
             Err(e) => self.dd_error(e),
@@ -405,10 +412,12 @@ impl Core {
 
         match self.interface.delete_user(user) {
             Ok(_) => Ok(Response {
-                message: None,
-                is_error: false,
-                status: Status::Ok,
                 body: None,
+                header: ResHeader {
+                    is_error: false,
+                    messages: None,
+                    status: Status::Ok,
+                },
             }),
 
             Err(e) => self.dd_error(e),
@@ -498,10 +507,12 @@ impl Core {
 
         match self.interface.update_user(username, password, permission) {
             Ok(_) => Ok(Response {
-                message: None,
-                is_error: false,
-                status: Status::Ok,
                 body: None,
+                header: ResHeader {
+                    is_error: false,
+                    messages: None,
+                    status: Status::Ok,
+                },
             }),
 
             Err(e) => self.dd_error(e),
@@ -531,10 +542,12 @@ impl Core {
 
         match self.interface.delete_database(database) {
             Ok(_) => Ok(Response {
-                message: None,
-                is_error: false,
-                status: Status::Ok,
                 body: None,
+                header: ResHeader {
+                    is_error: false,
+                    messages: None,
+                    status: Status::Ok,
+                },
             }),
 
             Err(e) => self.dd_error(e),
@@ -564,10 +577,12 @@ impl Core {
 
         match self.interface.get_from_dustdata(key) {
             Ok(value) => Ok(Response {
-                message: None,
-                is_error: false,
-                status: Status::Ok,
                 body: Some(value),
+                header: ResHeader {
+                    is_error: false,
+                    messages: None,
+                    status: Status::Ok,
+                },
             }),
 
             Err(e) => self.dd_error(e),
@@ -593,10 +608,12 @@ impl Core {
 
         match self.interface.delete_from_dustdata(key) {
             Ok(_) => Ok(Response {
-                message: None,
-                is_error: false,
-                status: Status::Ok,
                 body: None,
+                header: ResHeader {
+                    is_error: false,
+                    messages: None,
+                    status: Status::Ok,
+                },
             }),
 
             Err(e) => self.dd_error(e),
@@ -618,10 +635,12 @@ impl Core {
     fn ast_sgl_list(&mut self) -> Result<Response, Error> {
         match self.interface.list_from_dustdata() {
             Ok(keys) => Ok(Response {
-                message: None,
-                is_error: false,
-                status: Status::Ok,
                 body: Some(Bson::Array(keys.into_iter().map(Bson::String).collect())),
+                header: ResHeader {
+                    is_error: false,
+                    messages: None,
+                    status: Status::Ok,
+                },
             }),
 
             Err(e) => self.dd_error(e),
