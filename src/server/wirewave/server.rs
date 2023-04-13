@@ -15,6 +15,7 @@ use tokio_rustls::TlsAcceptor;
 
 use rustbase_scram::{AuthenticationStatus, ScramServer};
 
+use super::super::main::current_users;
 use super::authentication;
 use crate::config;
 
@@ -56,24 +57,20 @@ struct _Inner<T>(Arc<T>);
 
 pub struct Server<T: Wirewave> {
     svc: WirewaveServer<T>,
+    system_db: Arc<RwLock<dustdata::DustData>>,
     auth_provider: authentication::DefaultAuthenticationProvider,
-    require_authentication: bool,
 }
 
 impl<T: Wirewave> Server<T> {
-    pub fn new(
-        svc: WirewaveServer<T>,
-        system_db: Arc<RwLock<dustdata::DustData>>,
-        require_authentication: bool,
-    ) -> Self {
+    pub fn new(svc: WirewaveServer<T>, system_db: Arc<RwLock<dustdata::DustData>>) -> Self {
         let auth_provider = authentication::DefaultAuthenticationProvider {
-            dustdata: system_db,
+            dustdata: system_db.clone(),
         };
 
         Self {
             svc,
             auth_provider,
-            require_authentication,
+            system_db,
         }
     }
 
@@ -87,10 +84,16 @@ impl<T: Wirewave> Server<T> {
 
             let server = ScramServer::new(self.auth_provider.clone());
 
+            let system_db = Arc::clone(&self.system_db);
+
             tokio::spawn(async move {
                 println!("[Wirewave] incoming connection: {}", addr);
 
-                let username = if self.require_authentication {
+                let users = current_users(system_db);
+
+                let require_authentication = users > 0;
+
+                let username = if require_authentication {
                     let (status, username) = authentication_challenge(server, &mut stream).await;
 
                     if status != AuthenticationStatus::Authenticated {
@@ -138,12 +141,19 @@ impl<T: Wirewave> Server<T> {
             let server = ScramServer::new(self.auth_provider.clone());
 
             let acceptor = acceptor.clone();
+
+            let system_db = Arc::clone(&self.system_db);
+
             tokio::spawn(async move {
                 let mut stream = acceptor.accept(stream).await.unwrap();
 
                 println!("[Wirewave] incoming connection: {}", addr);
 
-                let username = if self.require_authentication {
+                let users = current_users(system_db);
+
+                let require_authentication = users > 0;
+
+                let username = if require_authentication {
                     let (status, username) = authentication_challenge(server, &mut stream).await;
 
                     if status != AuthenticationStatus::Authenticated {
