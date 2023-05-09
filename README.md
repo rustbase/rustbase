@@ -47,6 +47,13 @@ You can download the latest version of Rustbase [here](https://github.com/rustba
 ## MacOS
 **Currently, Rustbase is not available for MacOS.**
 
+## Docker
+You can use the official Docker image of Rustbase [here](https://github.com/rustbase/rustbase/pkgs/container/rustbase).
+
+```bash
+docker pull ghcr.io/rustbase/rustbase:latest
+```
+
 # External Components
 ## Rustbase CLI
 Use the [Rustbase CLI](https://github.com/rustbase/rustbase-cli) to manage your Rustbase Server.
