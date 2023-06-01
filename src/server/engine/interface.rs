@@ -55,7 +55,7 @@ impl DustDataInterface {
         &mut self,
         key: String,
         value: Bson,
-    ) -> Result<(), TransactionError> {
+    ) -> Result<Bson, TransactionError> {
         if self.current_database == "_default" {
             return Err(TransactionError::ExternalError(
                 Status::Reserved,
@@ -83,11 +83,13 @@ impl DustDataInterface {
 
         let dd = routers.get_mut(&self.current_database).unwrap();
 
-        dd.insert(&key, value)
-            .map_err(TransactionError::InternalError)
+        dd.insert(&key, value.clone())
+            .map_err(TransactionError::InternalError)?;
+
+        Ok(value)
     }
 
-    pub fn update_dustdata(&mut self, key: String, value: Bson) -> Result<(), TransactionError> {
+    pub fn update_dustdata(&mut self, key: String, value: Bson) -> Result<Bson, TransactionError> {
         if self.current_database == "_default" {
             return Err(TransactionError::ExternalError(
                 Status::Reserved,
@@ -112,8 +114,10 @@ impl DustDataInterface {
         let dd = routers.get_mut(&self.current_database);
 
         if let Some(dd) = dd {
-            dd.update(&key, value)
-                .map_err(TransactionError::InternalError)
+            dd.update(&key, value.clone())
+                .map_err(TransactionError::InternalError)?;
+
+            Ok(value)
         } else {
             Err(TransactionError::ExternalError(
                 Status::NotFound,
@@ -122,7 +126,7 @@ impl DustDataInterface {
         }
     }
 
-    pub fn delete_from_dustdata(&mut self, key: String) -> Result<(), TransactionError> {
+    pub fn delete_from_dustdata(&mut self, key: String) -> Result<Bson, TransactionError> {
         if self.current_database == "_default" {
             return Err(TransactionError::ExternalError(
                 Status::Reserved,
@@ -147,7 +151,9 @@ impl DustDataInterface {
         let dd = routers.get_mut(&self.current_database);
 
         if let Some(dd) = dd {
-            dd.delete(&key).map_err(TransactionError::InternalError)
+            dd.delete(&key).map_err(TransactionError::InternalError)?;
+
+            Ok(Bson::String(key))
         } else {
             Err(TransactionError::ExternalError(
                 Status::NotFound,
@@ -228,7 +234,7 @@ impl DustDataInterface {
         dd.list_keys().map_err(TransactionError::InternalError)
     }
 
-    pub fn delete_database(&mut self, database: String) -> Result<(), TransactionError> {
+    pub fn delete_database(&mut self, database: String) -> Result<Bson, TransactionError> {
         if self.current_database == "_default" {
             return Err(TransactionError::ExternalError(
                 Status::Reserved,
@@ -248,7 +254,7 @@ impl DustDataInterface {
         let mut routers = self.routers.write().unwrap();
 
         if let Some(mut dd) = routers.remove(&database) {
-            dd.lsm.drop();
+            dd.flush().unwrap();
             drop(dd);
 
             let database = database.clone();
@@ -262,7 +268,7 @@ impl DustDataInterface {
 
             println!("[Engine] database {} deleted", database);
 
-            Ok(())
+            Ok(bson::Bson::String(database))
         } else {
             Err(TransactionError::ExternalError(
                 Status::NotFound,
@@ -276,7 +282,7 @@ impl DustDataInterface {
         username: String,
         password: String,
         user_permission: UserPermission,
-    ) -> Result<(), TransactionError> {
+    ) -> Result<Bson, TransactionError> {
         if let Some(current_user) = &self.current_user {
             if !self.user_has_perm(current_user.clone(), UserPermission::Admin)? {
                 return Err(TransactionError::ExternalError(
@@ -309,10 +315,12 @@ impl DustDataInterface {
         };
 
         dd.insert(&username, Bson::Document(doc))
-            .map_err(TransactionError::InternalError)
+            .map_err(TransactionError::InternalError)?;
+
+        Ok(bson::Bson::String(username))
     }
 
-    pub fn delete_user(&mut self, username: String) -> Result<(), TransactionError> {
+    pub fn delete_user(&mut self, username: String) -> Result<Bson, TransactionError> {
         if let Some(current_user) = &self.current_user {
             if !self.user_has_perm(current_user.clone(), UserPermission::Admin)? {
                 return Err(TransactionError::ExternalError(
@@ -325,7 +333,9 @@ impl DustDataInterface {
         let mut dd = self.system_db.write().unwrap();
 
         dd.delete(&username)
-            .map_err(TransactionError::InternalError)
+            .map_err(TransactionError::InternalError)?;
+
+        Ok(bson::Bson::String(username))
     }
 
     pub fn update_user(
@@ -333,7 +343,7 @@ impl DustDataInterface {
         username: String,
         password: Option<String>,
         user_permission: Option<UserPermission>,
-    ) -> Result<(), TransactionError> {
+    ) -> Result<Bson, TransactionError> {
         if let Some(current_user) = &self.current_user {
             if !self.user_has_perm(current_user.clone(), UserPermission::Admin)? {
                 return Err(TransactionError::ExternalError(
@@ -387,7 +397,9 @@ impl DustDataInterface {
         }
 
         dd.update(&username, bson::to_bson(user).unwrap())
-            .map_err(TransactionError::InternalError)
+            .map_err(TransactionError::InternalError)?;
+
+        Ok(bson::Bson::String(username))
     }
 
     pub fn user_has_perm(

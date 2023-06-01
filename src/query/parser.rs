@@ -34,7 +34,7 @@ pub enum ASTNode {
 
     IntoExpression {
         keyword: Keywords,
-        json: Box<ASTNode>,
+        value: Box<ASTNode>,
         ident: Box<ASTNode>,
     },
 
@@ -45,6 +45,7 @@ pub enum ASTNode {
 
     Bson(Bson),
     Identifier(String),
+    VariableIdentifier(String),
 }
 
 #[derive(pest_derive::Parser)]
@@ -64,10 +65,7 @@ pub fn parse(input: &str) -> Result<Vec<ASTNode>> {
     for pair in pairs {
         match pair.as_rule() {
             Rule::EOI => break,
-            Rule::expr => ast.push(build_expr(pair.into_inner().next().unwrap())?),
-            _ => {
-                unreachable!();
-            }
+            _ => ast.push(build_expr(pair)?),
         }
     }
 
@@ -150,7 +148,7 @@ fn build_expr(pair: Pair<Rule>) -> Result<ASTNode> {
                         ))
                     }
                 },
-                json: Box::new(build_term(json)?),
+                value: Box::new(build_term(json)?),
                 ident: Box::new(build_term(ident)?),
             })
         }
@@ -180,10 +178,10 @@ fn build_expr(pair: Pair<Rule>) -> Result<ASTNode> {
             })
         }
 
-        Rule::terms => Ok(build_term(pair)?),
-        Rule::expr => Ok(build_expr(pair.into_inner().next().unwrap())?),
+        Rule::term => Ok(build_term(pair)?),
 
         _ => {
+            println!("{:#?}", pair.as_rule());
             unreachable!()
         }
     }
@@ -191,11 +189,18 @@ fn build_expr(pair: Pair<Rule>) -> Result<ASTNode> {
 
 fn build_term(pair: Pair<Rule>) -> Result<ASTNode> {
     match pair.as_rule() {
-        Rule::number | Rule::string | Rule::boolean | Rule::null | Rule::array | Rule::object => {
-            Ok(ASTNode::Bson(parse_to_bson(pair)))
-        }
+        Rule::integer
+        | Rule::float
+        | Rule::string
+        | Rule::boolean
+        | Rule::null
+        | Rule::array
+        | Rule::object => Ok(ASTNode::Bson(parse_to_bson(pair))),
         Rule::ident => Ok(ASTNode::Identifier(pair.as_str().to_string())),
-        Rule::terms => Ok(build_term(pair.into_inner().next().unwrap())?),
+        Rule::var_ident => Ok(ASTNode::VariableIdentifier(
+            pair.into_inner().next().unwrap().as_str().to_string(),
+        )),
+        Rule::term => Ok(build_term(pair.into_inner().next().unwrap())?),
         _ => {
             unreachable!()
         }
@@ -223,7 +228,8 @@ fn parse_to_bson(pair: Pair<Rule>) -> Bson {
             Bson::Array(arr)
         }
         Rule::string => Bson::String(pair.into_inner().next().unwrap().as_str().to_string()),
-        Rule::number => Bson::Int64(pair.as_str().parse().unwrap()),
+        Rule::integer => Bson::Int64(pair.as_str().parse().unwrap()),
+        Rule::float => Bson::Double(pair.as_str().parse().unwrap()),
         Rule::boolean => Bson::Boolean(pair.as_str().parse().unwrap()),
         Rule::null => Bson::Null,
         _ => {

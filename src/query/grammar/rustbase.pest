@@ -1,58 +1,57 @@
-program = _{ SOI ~ "\n"* ~ (stmt ~ "&"+) * ~ stmt? ~ EOI }
-stmt = _{ expr }
+program = _{ SOI ~ "\n"* ~ (stmt ~ ";")* ~ stmt? ~ EOI }
+stmt    = _{ expr }
 
-expr = {
-      assgmtExpr
-    | monadicExpr
-    | intoExpr
-    | sglExpr
-    | terms
+expr = _{
+    assgmtExpr
+  | monadicExpr
+  | intoExpr
+  | sglExpr
 }
 
 // exprs
-assgmtExpr = { ident ~ "=" ~ expr }
-monadicExpr = { keyword ~ verb ~ ((expr | ident)+)? }
-intoExpr = { keyword ~ json ~ "into" ~ ident }
-sglExpr = { keyword ~ ident? }
+assgmtExpr  = { ident ~ "=" ~ (expr | term) }
+monadicExpr = { keyword ~ verb ~ (expr | ident)* }
+intoExpr    = { keyword ~ term ~ "into" ~ (ident | var_ident) }
+sglExpr     = { keyword ~ (term)? }
 
 // terms
 object = {
-    "{" ~ "}" |
-    "{" ~ pair ~ ("," ~ pair)* ~ "}"
+    "{" ~ "}"
+  | "{" ~ pair ~ ("," ~ pair)* ~ "}"
 }
-pair = { string ~ ":" ~ value }
+pair   = { string ~ ":" ~ value }
 
-array = {
-    "[" ~ "]" |
-    "[" ~ value ~ ("," ~ value)* ~ "]"
+array     =  {
+    "[" ~ "]"
+  | "[" ~ value ~ ("," ~ value)* ~ "]"
 }
-value = _{ object | array | string | number | boolean | null }
-boolean = { "true" | "false" }
-null = { "null" }
-string = ${ "\"" ~ inner ~ "\"" }
-inner = @{ char* }
-char = {
+value     = _{ object | array | string | float | integer | boolean | null | ident | var_ident }
+boolean   =  { "true" | "false" }
+null      =  { "null" }
+string    = ${ "\"" ~ inner ~ "\"" }
+inner     = @{ char* }
+char      =  {
     !("\"" | "\\") ~ ANY
-    | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
-    | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+  | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+  | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
 }
-number = @{
-    "-"?
-    ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)
-    ~ ("." ~ ASCII_DIGIT*)?
-    ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?
+float     = @{
+    "-"? ~ ASCII_DIGIT* ~ "." ~ ASCII_DIGIT+ ~ (("e" | "E") ~ ("+" | "-")? ~ ASCII_DIGIT+)?
 }
-json = _{ value }
-ident = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+integer   = @{
+    "-"? ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)
+}
+json      = _{ value }
+ident     = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+var_ident = ${ "$" ~ ident }
 
-terms = { term+ }
-term = _{ json }
+term = { json }
 
 // verbs
 verb = { "user" | "database" }
 
 // keyword
-keyword = { "insert" | "get" | "delete" | "update" | "list"}
+keyword = { "insert" | "get" | "delete" | "update" | "list" }
 
 WHITESPACE = _{ " " | "\t" | "\n" }
-COMMENT = _{ "#" ~ (!"\n" ~ ANY)* }
+COMMENT    = _{ "#" ~ (!"\n" ~ ANY)* }

@@ -89,7 +89,7 @@ impl Wirewave for Database {
                         username,
                     );
 
-                    core.run_ast(query[0].clone())
+                    core.run_ast(query)
                 }
             })
     }
