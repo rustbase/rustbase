@@ -1,32 +1,34 @@
-FROM bitnami/minideb:bullseye
+FROM rust:alpine as builder
 
-# Install dependencies
-RUN install_packages \
-    ca-certificates \
-    curl \
-    gnupg \
-    lsb-release \
-    procps \
-    sudo \
-    unzip
+WORKDIR /usr/src
 
-RUN set -eux; \
-    groupadd -r rustbase --gid=999; \
-    useradd -r -g rustbase --uid=999 --home-dir=/var/lib/rustbase --shell=/bin/bash rustbase; \
-    mkdir -p /var/lib/rustbase; \
-    chown -R rustbase:rustbase /var/lib/rustbase
+RUN apk add openssl-dev musl-dev
 
-ENV RUSTBASE_INSTALL_PATH /var/lib/rustbase
-ENV PATH $PATH:/var/lib/rustbase
+RUN USER=root cargo new rustbase
 
-RUN curl -sS https://raw.githubusercontent.com/rustbase/rustbase-install/main/install.sh | bash -s -- --no-cli --no-service
+COPY Cargo.toml Cargo.lock /usr/src/rustbase/
+COPY src/build.rs /usr/src/rustbase/src/
+COPY .cargo/ /usr/src/rustbase/.cargo/
 
-RUN mkdir -p /var/lib/rustbase/data && \
-    chown -R rustbase:rustbase /var/lib/rustbase
+WORKDIR /usr/src/rustbase
 
-VOLUME /var/lib/rustbase/data
+RUN rustup target add x86_64-unknown-linux-musl
+RUN cargo build --release --target x86_64-unknown-linux-musl
 
-# Expose the default port
+COPY src /usr/src/rustbase/src/
+
+RUN touch /usr/src/rustbase/src/main.rs
+
+RUN TARGET_CC=x86_64-linux-musl-gcc cargo build --target x86_64-unknown-linux-musl --release
+
+# -------
+
+FROM alpine:latest as runtime
+
+COPY --from=builder /usr/src/rustbase/target/x86_64-unknown-linux-musl/release/rustbase /usr/local/bin/rustbase/rustbase_server
+
+VOLUME /usr/local/bin/rustbase/data
+
 EXPOSE 23561
 
-CMD ["rustbase_server"]
+CMD ["/usr/local/bin/rustbase/rustbase_server"]
