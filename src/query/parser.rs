@@ -1,4 +1,4 @@
-use super::{QueryError, QueryErrorType, Result};
+use super::{GrammarError, Result};
 use bson::{Bson, Document};
 use pest::iterators::Pair;
 use pest::Parser;
@@ -56,7 +56,7 @@ pub fn parse(input: &str) -> Result<Vec<ASTNode>> {
     let pairs = match RustbaseParser::parse(Rule::program, input) {
         Ok(e) => e,
         Err(e) => {
-            return Err(QueryError(QueryErrorType::SyntaxError, e.to_string()));
+            return Err(GrammarError::with_message(&e.to_string()));
         }
     };
 
@@ -104,22 +104,12 @@ fn build_expr(pair: Pair<Rule>) -> Result<ASTNode> {
                     "insert" => Keywords::Insert,
                     "delete" => Keywords::Delete,
                     "update" => Keywords::Update,
-                    _ => {
-                        return Err(QueryError(
-                            QueryErrorType::UnexpectedToken,
-                            "invalid keyword".to_string(),
-                        ))
-                    }
+                    _ => return Err(GrammarError::with_pair("invalid keyword", keyword)),
                 },
                 verb: match verb.as_str() {
                     "user" => Verbs::User,
                     "database" => Verbs::Database,
-                    _ => {
-                        return Err(QueryError(
-                            QueryErrorType::UnexpectedToken,
-                            "invalid verb".to_string(),
-                        ))
-                    }
+                    _ => return Err(GrammarError::with_pair("invalid verb", verb)),
                 },
                 expr: if exprs.is_empty() { None } else { Some(exprs) },
             })
@@ -135,12 +125,7 @@ fn build_expr(pair: Pair<Rule>) -> Result<ASTNode> {
                 keyword: match keyword.as_str() {
                     "insert" => Keywords::Insert,
                     "update" => Keywords::Update,
-                    _ => {
-                        return Err(QueryError(
-                            QueryErrorType::UnexpectedToken,
-                            "invalid keyword".to_string(),
-                        ))
-                    }
+                    _ => return Err(GrammarError::with_pair("invalid keyword", keyword)),
                 },
                 value: Box::new(build_term(json)?),
                 ident: Box::new(build_term(ident)?),
@@ -157,12 +142,7 @@ fn build_expr(pair: Pair<Rule>) -> Result<ASTNode> {
                     "get" => Keywords::Get,
                     "delete" => Keywords::Delete,
                     "list" => Keywords::List,
-                    _ => {
-                        return Err(QueryError(
-                            QueryErrorType::UnexpectedToken,
-                            "invalid keyword".to_string(),
-                        ))
-                    }
+                    _ => return Err(GrammarError::with_pair("invalid keyword", keyword)),
                 },
                 ident: if let Some(ident) = ident {
                     Some(Box::new(build_term(ident)?))

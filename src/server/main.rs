@@ -56,43 +56,20 @@ impl Wirewave for Database {
         let database = body.get_str("database").unwrap();
         let query = body.get_str("query").unwrap();
 
-        self.pool
-            .install(move || match query::parser::parse(query) {
-                Err(e) => match e.0 {
-                    query::QueryErrorType::SyntaxError => {
-                        let error = Error {
-                            message: e.1,
-                            query_message: None,
-                            status: Status::SyntaxError,
-                        };
+        self.pool.install(move || {
+            let query = query::parser::parse(query)?;
 
-                        Err(error)
-                    }
+            let mut core = Core::new(
+                self.cache.clone(),
+                self.routers.clone(),
+                self.config.clone(),
+                self.system_db.clone(),
+                database.to_string(),
+                username,
+            );
 
-                    query::QueryErrorType::UnexpectedToken => {
-                        let error = Error {
-                            message: e.1,
-                            query_message: None,
-                            status: Status::InvalidQuery,
-                        };
-
-                        Err(error)
-                    }
-                },
-
-                Ok(query) => {
-                    let mut core = Core::new(
-                        self.cache.clone(),
-                        self.routers.clone(),
-                        self.config.clone(),
-                        self.system_db.clone(),
-                        database.to_string(),
-                        username,
-                    );
-
-                    core.run_ast(query)
-                }
-            })
+            core.run_ast(query)
+        })
     }
 
     async fn new_connection(&self, username: Option<String>, addr: SocketAddr) {
