@@ -4,6 +4,7 @@ use dustdata::{DustData, DustDataConfig, LsmConfig, Size};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 
 use super::cache;
@@ -92,6 +93,14 @@ impl Wirewave for Database {
                     core.run_ast(query)
                 }
             })
+    }
+
+    async fn new_connection(&self, username: Option<String>, addr: SocketAddr) {
+        println!(
+            "[Server] new connection from {} as {}",
+            addr,
+            username.unwrap_or("anonymous".to_string()).yellow(),
+        )
     }
 }
 

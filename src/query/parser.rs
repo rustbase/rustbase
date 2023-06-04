@@ -89,19 +89,13 @@ fn build_expr(pair: Pair<Rule>) -> Result<ASTNode> {
             let mut inner_rules = pair.clone().into_inner();
             let keyword = inner_rules.next().unwrap();
             let verb = inner_rules.next().unwrap();
-            let expr = inner_rules.next();
 
             let mut exprs = Vec::new();
 
-            if expr.is_some() {
-                for pair in pair.into_inner() {
-                    match pair.as_rule() {
-                        Rule::expr => exprs.push(build_expr(pair)?),
-                        Rule::ident => exprs.push(build_term(pair)?),
-                        _ => {
-                            continue;
-                        }
-                    }
+            for pair in inner_rules {
+                match pair.as_rule() {
+                    Rule::ident => exprs.push(build_term(pair)?),
+                    _ => exprs.push(build_expr(pair)?),
                 }
             }
 

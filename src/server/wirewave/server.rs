@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::future::Future;
 use std::io::{self, BufReader};
+use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -40,6 +41,7 @@ const BUFFER_SIZE: usize = 8 * 1024;
 #[async_trait]
 pub trait Wirewave: Send + Sync + 'static {
     async fn request(&self, request: Request, username: Option<String>) -> Result<Response, Error>;
+    async fn new_connection(&self, username: Option<String>, addr: SocketAddr);
 }
 
 pub struct WirewaveServer<T: Wirewave> {
@@ -87,8 +89,6 @@ impl<T: Wirewave> Server<T> {
             let system_db = Arc::clone(&self.system_db);
 
             tokio::spawn(async move {
-                println!("[Wirewave] incoming connection: {}", addr);
-
                 let users = current_users(system_db);
 
                 let require_authentication = users > 0;
@@ -107,6 +107,8 @@ impl<T: Wirewave> Server<T> {
                 } else {
                     None
                 };
+
+                svc.inner.0.new_connection(username.clone(), addr).await;
 
                 handle_connection(stream, move |request| {
                     let svc = svc.clone();
@@ -147,8 +149,6 @@ impl<T: Wirewave> Server<T> {
             tokio::spawn(async move {
                 let mut stream = acceptor.accept(stream).await.unwrap();
 
-                println!("[Wirewave] incoming connection: {}", addr);
-
                 let users = current_users(system_db);
 
                 let require_authentication = users > 0;
@@ -167,6 +167,8 @@ impl<T: Wirewave> Server<T> {
                 } else {
                     None
                 };
+
+                svc.inner.0.new_connection(username.clone(), addr).await;
 
                 handle_connection(stream, move |request| {
                     let svc = svc.clone();
