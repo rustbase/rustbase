@@ -20,7 +20,7 @@ use engine::core::Core;
 use server::route;
 use wirewave::server::{Error, Request, Response, Server, Status, Wirewave, WirewaveServer};
 
-pub struct Database {
+pub struct RustbaseServer {
     pool: ThreadPool,
     routers: Arc<RwLock<HashMap<String, DustData>>>,
     config: Arc<schema::RustbaseConfig>,
@@ -29,7 +29,7 @@ pub struct Database {
 }
 
 #[async_trait]
-impl Wirewave for Database {
+impl Wirewave for RustbaseServer {
     async fn request(&self, request: Request, username: Option<String>) -> Result<Response, Error> {
         let body = request.body;
 
@@ -79,9 +79,13 @@ impl Wirewave for Database {
             username.unwrap_or("anonymous".to_string()).yellow(),
         )
     }
+
+    async fn require_authentication(&self) -> bool {
+        current_users(self.system_db.clone()) > 0
+    }
 }
 
-pub fn current_users(system_db: Arc<RwLock<DustData>>) -> usize {
+fn current_users(system_db: Arc<RwLock<DustData>>) -> usize {
     let dd = system_db.read().unwrap();
 
     dd.list_keys().unwrap().len()
@@ -122,7 +126,7 @@ pub async fn initalize_server(config: schema::RustbaseConfig) {
         .build()
         .unwrap();
 
-    let database = Database {
+    let database = RustbaseServer {
         pool,
         routers,
         cache,
