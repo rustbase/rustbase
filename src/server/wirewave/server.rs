@@ -41,7 +41,7 @@ const BUFFER_SIZE: usize = 8 * 1024;
 pub trait Wirewave: Send + Sync + 'static {
     async fn request(&self, request: Request, username: Option<String>) -> Result<Response, Error>;
     async fn new_connection(&self, username: Option<String>, addr: SocketAddr);
-    async fn require_authentication(&self) -> bool;
+    async fn server_context(&self) -> ServerContext;
 }
 
 pub struct WirewaveServer<T: Wirewave> {
@@ -78,13 +78,11 @@ impl<T: Wirewave> Server<T> {
             let (mut stream, addr) = listener.accept().await.unwrap();
 
             let svc = self.svc.clone();
+            let server_context = self.svc.inner.0.server_context().await;
 
             let server = ScramServer::new(self.auth_provider.clone());
-
-            let require_authentication = self.svc.inner.0.require_authentication().await;
-
             tokio::spawn(async move {
-                let username = if require_authentication {
+                let username = if server_context.require_authentication {
                     let (status, username) = authentication_challenge(server, &mut stream).await;
 
                     if status != AuthenticationStatus::Authenticated {
@@ -135,12 +133,12 @@ impl<T: Wirewave> Server<T> {
 
             let acceptor = acceptor.clone();
 
-            let require_authentication = self.svc.inner.0.require_authentication().await;
+            let server_context = self.svc.inner.0.server_context().await;
 
             tokio::spawn(async move {
                 let mut stream = acceptor.accept(stream).await.unwrap();
 
-                let username = if require_authentication {
+                let username = if server_context.require_authentication {
                     let (status, username) = authentication_challenge(server, &mut stream).await;
 
                     if status != AuthenticationStatus::Authenticated {
@@ -246,6 +244,11 @@ pub enum Status {
     InternalError,
 }
 
+#[derive(Debug, Clone)]
+pub struct ServerContext {
+    pub require_authentication: bool,
+}
+
 // if is ok, return request else return response and send to client
 fn process_request(buf: &[u8]) -> Result<Request, Response> {
     let request: Request = match bson::from_slice(buf) {
@@ -288,6 +291,16 @@ where
     }
 
     Ok(request_bytes)
+}
+
+pub async fn write_socket<IO, D>(socket: &mut IO, data: &D) -> io::Result<()>
+where
+    IO: AsyncRead + AsyncWrite + Unpin,
+    D: Sized + Serialize,
+{
+    let data = bson::to_vec(data).unwrap();
+
+    socket.write_all(&data).await
 }
 
 async fn handle_connection<F, Fut, IO>(mut socket: IO, callback: F)
@@ -341,15 +354,10 @@ where
                     },
                 };
 
-                let response = bson::to_bson(&response).unwrap();
-                let response = bson::to_vec(&response).unwrap();
-
-                socket.write_all(&response).await.ok();
+                write_socket(&mut socket, &response).await.ok();
             }
             Err(response) => {
-                let response = bson::to_vec(&response).unwrap();
-
-                socket.write_all(&response).await.ok();
+                write_socket(&mut socket, &response).await.ok();
             }
         }
     }

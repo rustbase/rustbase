@@ -18,7 +18,9 @@ use cache::Cache;
 use config::schema;
 use engine::core::Core;
 use server::route;
-use wirewave::server::{Error, Request, Response, Server, Status, Wirewave, WirewaveServer};
+use wirewave::server::{
+    Error, Request, Response, Server, ServerContext, Status, Wirewave, WirewaveServer,
+};
 
 pub struct RustbaseServer {
     pool: ThreadPool,
@@ -80,8 +82,12 @@ impl Wirewave for RustbaseServer {
         )
     }
 
-    async fn require_authentication(&self) -> bool {
-        current_users(self.system_db.clone()) > 0
+    async fn server_context(&self) -> ServerContext {
+        let require_auth = current_users(self.system_db.clone()) > 0;
+
+        ServerContext {
+            require_authentication: require_auth,
+        }
     }
 }
 
